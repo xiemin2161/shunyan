@@ -20,4 +20,11 @@ dist/
 build/
 coverage/
 .cache/
+work/
 *.log
+
+# Python host local runtime files
+__pycache__/
+*.py[cod]
+.venv/
+venv/

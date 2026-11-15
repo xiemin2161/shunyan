@@ -1,0 +1,12 @@
+{
+  "name": "三键语音控制面板",
+  "short_name": "三键控制",
+  "description": "连接 Windows 或 macOS 本机服务的快捷键控制面板。",
+  "lang": "zh-CN",
+  "start_url": "./index.html",
+  "scope": "./",
+  "display": "standalone",
+  "orientation": "any",
+  "theme_color": "#e9edf0",
+  "background_color": "#eef1f2"
+}

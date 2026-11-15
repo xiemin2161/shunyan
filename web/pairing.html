@@ -1,0 +1,23 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <meta name="theme-color" content="#e9edf0">
+  <link rel="stylesheet" href="./styles.css">
+  <title>本机配对码</title>
+</head>
+<body class="pairing-page">
+  <main class="pairing-card">
+    <p class="eyebrow">LOCAL DEVICE PAIRING</p>
+    <h1>本机配对码</h1>
+    <p class="pairing-copy">请在电脑本机查看并将此码输入手机设置页。配对码仅可使用一次，切勿截图或分享给他人。</p>
+    <output class="pairing-code" id="pairing-code" aria-live="polite" aria-label="六位一次性配对码">······</output>
+    <p class="pairing-expiry" id="pairing-expiry" role="status" aria-live="polite">正在读取配对码…</p>
+    <div class="pairing-actions"><button class="button secondary" id="refresh-code" type="button">重新读取</button><button class="button primary" id="rotate-code" type="button">重新生成</button><button class="button secondary" id="copy-code" type="button" disabled>复制配对码</button></div>
+    <p class="pairing-help">本页面只在运行服务的电脑上有效。局域网设备不能读取配对码；配对码过期后可刷新。</p>
+  </main>
+  <div class="toast-region" id="toast-region" role="status" aria-live="polite" aria-atomic="true"></div>
+  <script src="./pairing.js" defer></script>
+</body>
+</html>

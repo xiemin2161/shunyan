@@ -1,0 +1,158 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <meta name="theme-color" content="#e8edef">
+  <link rel="manifest" href="./manifest.webmanifest">
+  <link rel="stylesheet" href="./styles.css">
+  <title>设备设置</title>
+</head>
+<body class="settings-page">
+  <div class="settings-app">
+    <aside class="side-rail" aria-label="设置导航">
+      <a class="brand-lockup" href="./index.html" aria-label="顺言控制面板">
+        <span class="brand-mark" aria-hidden="true"><i></i><i></i><i></i></span>
+        <span><b>顺言</b><small>三键控制面板</small></span>
+      </a>
+      <nav class="primary-nav">
+        <a class="nav-item is-active" href="#device" data-settings-section="device" aria-current="page">
+          <svg viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="4" width="18" height="15" rx="3"/><path d="M7 8h2m3 0h2m3 0h.1M7 12h2m3 0h2m3 0h.1M9 19v2m6-2v2m-6 0h6"/></svg><span>设备控制</span>
+        </a>
+        <a class="nav-item" href="#mapping" data-settings-section="mapping">
+          <svg viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="3" width="8" height="8" rx="2"/><rect x="13" y="3" width="8" height="8" rx="2"/><rect x="3" y="13" width="8" height="8" rx="2"/><rect x="13" y="13" width="8" height="8" rx="2"/></svg><span>按键映射</span>
+        </a>
+        <a class="nav-item" href="#connection" data-settings-section="connection">
+          <svg viewBox="0 0 24 24" aria-hidden="true"><path d="m9.4 14.6-1.8 1.8a4 4 0 0 1-5.7-5.7l4-4a4 4 0 0 1 5.7 0m3 2.7 1.8-1.8a4 4 0 0 1 5.7 5.7l-4 4a4 4 0 0 1-5.7 0m-6-1.5 8-8"/></svg><span>连接设置</span>
+        </a>
+        <a class="nav-item" href="#appearance" data-settings-section="appearance">
+          <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3a9 9 0 1 0 0 18h1.2a2.4 2.4 0 0 0 1.6-4.2 1.7 1.7 0 0 1 1.2-3h1.1A4.9 4.9 0 0 0 22 9c0-3.3-4.5-6-10-6Z"/><circle cx="7.5" cy="10" r="1"/><circle cx="11" cy="6.8" r="1"/><circle cx="16" cy="7.8" r="1"/></svg><span>外观设置</span>
+        </a>
+      </nav>
+      <div class="rail-footer">
+        <a href="/pairing.html" id="pairing-page-link" class="pairing-shortcut">在电脑上查看配对码 <span aria-hidden="true">↗</span></a>
+        <span class="rail-version">本地运行 · 不连接云端</span>
+      </div>
+    </aside>
+
+    <div class="app-main">
+      <header class="workspace-header">
+        <a class="mobile-brand" href="./index.html" aria-label="返回控制面板"><span class="brand-mark" aria-hidden="true"><i></i><i></i><i></i></span><b>顺言</b></a>
+        <div class="heading-block"><p class="breadcrumb">控制面板 <span aria-hidden="true">/</span> 设置</p><h1 id="section-title">设备控制</h1></div>
+        <div class="header-actions">
+          <span class="connection-pill" id="connection-pill"><i></i><span>检查连接…</span></span>
+          <a class="preview-link" href="./index.html" aria-label="打开按键控制页">
+            <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M2.5 12s3.5-6 9.5-6 9.5 6 9.5 6-3.5 6-9.5 6-9.5-6-9.5-6Z"/><circle cx="12" cy="12" r="2.7"/></svg><span>界面预览</span>
+          </a>
+        </div>
+      </header>
+
+      <main class="workspace-content">
+        <section class="settings-view is-visible" data-settings-panel="device" aria-labelledby="section-title">
+          <div class="device-dashboard">
+            <div class="preview-card">
+              <div class="preview-card-head"><div><p class="eyebrow">面板预览</p><h2>三键控制器</h2></div><span class="preview-tag">前台样式</span></div>
+              <div class="preview-stage device-stage" data-device-stage="preview">
+                <section class="device-shell style-soft" id="settings-device-preview" data-device-shell data-form-factor="desktop" aria-label="三键控制器预览">
+                  <span class="screw screw-top-left" aria-hidden="true"><img src="./assets/screw-cross.svg" alt=""></span><span class="screw screw-top-right" aria-hidden="true"><img src="./assets/screw-cross.svg" alt=""></span>
+                  <span class="screw screw-bottom-left" aria-hidden="true"><img src="./assets/screw-cross.svg" alt=""></span><span class="screw screw-bottom-right" aria-hidden="true"><img src="./assets/screw-cross.svg" alt=""></span>
+                  <div class="device-screen" aria-live="polite">
+                    <div class="screen-kicker"><span class="screen-led screen-state-unknown" data-codex-led></span><span>CODEX · 本地状态</span></div>
+                    <strong class="screen-title" data-codex-title>状态未知</strong>
+                    <p class="screen-detail" data-codex-detail>等待已配对主机反馈</p>
+                  </div>
+                  <div class="key-row" aria-hidden="true">
+                    <div class="key voice-key"><span class="key-face"><span class="key-icon" id="preview-voice-icon"></span></span></div>
+                    <div class="key confirm-key"><span class="key-face"><span class="key-icon" id="preview-confirm-icon"></span></span></div>
+                    <div class="key cancel-key"><span class="key-face"><span class="key-icon" id="preview-cancel-icon"></span></span></div>
+                  </div>
+                </section>
+              </div>
+            </div>
+
+            <section class="status-panel" aria-labelledby="codex-heading">
+              <div class="panel-heading"><div><p class="eyebrow">电脑反馈</p><h2 id="codex-heading">Codex 状态</h2></div><span class="status-badge" id="settings-codex-badge">未知</span></div>
+              <div class="status-display" id="settings-codex-state" data-state="unknown">
+                <span class="status-orbit" aria-hidden="true"><i></i></span>
+                <strong id="settings-codex-title">状态未知</strong>
+                <p id="settings-codex-detail">等待主机提供可验证的 Codex 状态</p>
+              </div>
+              <div class="event-row"><span class="event-dot" aria-hidden="true"></span><div><b>最近状态更新</b><small id="settings-codex-time">尚无事件</small></div></div>
+              <p class="status-privacy">仅显示经主机确认的状态摘要，不显示 Codex 对话内容。</p>
+            </section>
+          </div>
+        </section>
+
+        <section class="settings-view" data-settings-panel="mapping" aria-labelledby="section-title" hidden>
+          <div class="section-intro"><p class="eyebrow">按键行为</p><h2>设置触发方式与快捷键</h2><p>映射发送给当前正在监听快捷键的软件。支持单键和修饰键组合。</p></div>
+          <section class="settings-panel mapping-panel">
+            <fieldset class="mode-options"><legend>语音按键触发方式</legend>
+              <label class="mode-card"><input type="radio" name="voice-mode" value="toggle" checked><span><b>点按切换</b><small>点一下开始，再点一下停止</small></span></label>
+              <label class="mode-card"><input type="radio" name="voice-mode" value="hold"><span><b>按住说话</b><small>按住时按下映射键，松开时释放</small></span></label>
+            </fieldset>
+            <div class="mapping-grid">
+              <label class="field"><span>语音开始</span><input id="mapping-voice-start" autocomplete="off" spellcheck="false" value="ALT_RIGHT" placeholder="ALT_RIGHT 或 CTRL_LEFT+SHIFT_LEFT+S"><small>多个键用 + 连接，主键放在最后</small></label>
+              <label class="field"><span>语音停止</span><input id="mapping-voice-stop" autocomplete="off" spellcheck="false" value="ALT_RIGHT" placeholder="ALT_RIGHT"><small>可与语音开始使用相同快捷键</small></label>
+              <label class="field"><span>确认</span><input id="mapping-confirm" autocomplete="off" spellcheck="false" value="ENTER" placeholder="ENTER"></label>
+              <label class="field"><span>取消</span><input id="mapping-cancel" autocomplete="off" spellcheck="false" value="ESC" placeholder="ESC"></label>
+            </div>
+            <p class="key-help">可用键：ALT、CTRL、SHIFT、META、Enter、Esc、空格、Tab、A–Z、0–9、F1–F12。Mac 上 META 显示为 Command，ALT 显示为 Option。</p>
+          </section>
+        </section>
+
+        <section class="settings-view" data-settings-panel="connection" aria-labelledby="section-title" hidden>
+          <div class="section-intro"><p class="eyebrow">本机连接</p><h2>连接这台电脑</h2><p>手机与电脑在同一网络时，使用一次性配对码建立本地连接。</p></div>
+          <section class="settings-panel connection-panel">
+            <div class="connection-grid">
+              <label class="field"><span>本机服务地址</span><input id="host-origin" type="url" readonly aria-describedby="host-origin-help"><small id="host-origin-help">由电脑服务提供网页时自动填写</small></label>
+              <label class="field"><span>一次性配对码</span><div class="pair-row"><input id="pair-code" inputmode="numeric" autocomplete="one-time-code" maxlength="12" placeholder="输入电脑显示的配对码"><button class="button primary" id="pair-button" type="button">连接</button></div></label>
+            </div>
+            <div class="connection-instructions"><span class="instruction-icon" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="M12 3v12m-5-5 5 5 5-5"/><path d="M5 16v3h14v-3"/></svg></span><p>配对码只在电脑本机显示。请在运行服务的电脑打开本机服务地址下的 <code>/pairing.html</code>。配对码只能使用一次。</p><a href="/pairing.html" id="pairing-page-shortcut">在电脑上打开配对码页</a></div>
+            <div class="connection-separator"></div>
+            <div class="audio-device-reserved">
+              <div><b>虚拟音频设备</b><small>选择电脑上已安装并列出的虚拟音频播放端，再在闪电说中选择同一条虚拟音频线的录音端。设备名称由系统实际枚举，软件不会自动匹配 UU 等设备。语音期间需允许手机浏览器使用麦克风，音频仅实时转发，不保存录音。</small></div>
+              <div>
+                <label class="field"><span>主机端播放设备</span><select id="audio-output-device" disabled><option value="">连接电脑后读取可用设备</option></select></label>
+                <div class="settings-actions">
+                  <button class="button secondary" id="refresh-audio-devices" type="button" disabled>刷新设备</button>
+                  <button class="button primary" id="save-audio-device" type="button" disabled>保存音频设备</button>
+                </div>
+              </div>
+            </div>
+            <button class="text-action" id="disconnect-button" type="button" hidden>断开此设备</button>
+          </section>
+        </section>
+
+        <section class="settings-view" data-settings-panel="appearance" aria-labelledby="section-title" hidden>
+          <div class="section-intro"><p class="eyebrow">按键外观</p><h2>调整键帽与图标</h2><p>修改会同步应用到前台控制页。每颗按键可单独配色与更换图标。</p></div>
+          <div class="appearance-layout">
+            <section class="settings-panel appearance-panel">
+              <div class="appearance-controls">
+                <label class="field"><span>整体风格</span><select id="key-style"><option value="soft">柔光透亮</option><option value="glass">雾面玻璃</option><option value="solid">简洁实色</option></select></label>
+                <label class="field radius-field"><span>键帽圆角 <output id="radius-value">22 px</output></span><input id="key-radius" type="range" min="12" max="34" value="22"></label>
+              </div>
+              <div class="key-appearance-grid">
+                <fieldset class="key-appearance-card"><legend>语音键</legend><label class="field"><span>图标</span><select id="icon-voice"><option value="mic">麦克风</option><option value="wave">声波</option><option value="record">录音</option><option value="custom" hidden>自定义图片</option></select></label><div class="color-fields"><label class="field"><span>键帽颜色</span><input id="color-voice" type="color" value="#d9eee7"></label><label class="field"><span>背光颜色</span><input id="glow-voice" type="color" value="#8ce9be"></label></div><div class="icon-upload-row"><label class="upload-button">上传 PNG/WebP<input id="upload-voice" type="file" accept="image/png,image/webp"></label><button class="clear-icon" id="clear-icon-voice" type="button" hidden>移除图片</button><small id="icon-state-voice">内置图标</small></div></fieldset>
+                <fieldset class="key-appearance-card"><legend>确认键</legend><label class="field"><span>图标</span><select id="icon-confirm"><option value="check">勾选</option><option value="enter">回车</option><option value="check-circle">圆形勾选</option><option value="custom" hidden>自定义图片</option></select></label><div class="color-fields"><label class="field"><span>键帽颜色</span><input id="color-confirm" type="color" value="#e0ebf5"></label><label class="field"><span>背光颜色</span><input id="glow-confirm" type="color" value="#83c9ff"></label></div><div class="icon-upload-row"><label class="upload-button">上传 PNG/WebP<input id="upload-confirm" type="file" accept="image/png,image/webp"></label><button class="clear-icon" id="clear-icon-confirm" type="button" hidden>移除图片</button><small id="icon-state-confirm">内置图标</small></div></fieldset>
+                <fieldset class="key-appearance-card"><legend>取消键</legend><label class="field"><span>图标</span><select id="icon-cancel"><option value="x">叉号</option><option value="back">返回</option><option value="stop">停止</option><option value="custom" hidden>自定义图片</option></select></label><div class="color-fields"><label class="field"><span>键帽颜色</span><input id="color-cancel" type="color" value="#f3e4e3"></label><label class="field"><span>背光颜色</span><input id="glow-cancel" type="color" value="#f5a39a"></label></div><div class="icon-upload-row"><label class="upload-button">上传 PNG/WebP<input id="upload-cancel" type="file" accept="image/png,image/webp"></label><button class="clear-icon" id="clear-icon-cancel" type="button" hidden>移除图片</button><small id="icon-state-cancel">内置图标</small></div></fieldset>
+              </div>
+            </section>
+            <section class="appearance-note"><span class="appearance-note-icon" aria-hidden="true">✦</span><h3>自定义图片要求</h3><p>只接收 PNG 或 WebP 图片，单张不超过 256 KiB。为保持按键辨识度，建议使用透明底的方形图标。</p></section>
+          </div>
+        </section>
+      </main>
+      <footer class="settings-actions" data-settings-actions hidden><button class="button secondary" id="reset-button" type="button">恢复默认</button><button class="button primary" id="save-button" type="button">保存设置</button></footer>
+    </div>
+  </div>
+
+  <nav class="mobile-nav" aria-label="设置导航">
+    <a class="nav-item is-active" href="#device" data-settings-section="device" aria-current="page"><svg viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="4" width="18" height="15" rx="3"/><path d="M7 8h2m3 0h2m3 0h.1M7 12h2m3 0h2m3 0h.1"/></svg><span>控制</span></a>
+    <a class="nav-item" href="#mapping" data-settings-section="mapping"><svg viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="3" width="8" height="8" rx="2"/><rect x="13" y="3" width="8" height="8" rx="2"/><rect x="3" y="13" width="8" height="8" rx="2"/><rect x="13" y="13" width="8" height="8" rx="2"/></svg><span>映射</span></a>
+    <a class="nav-item" href="#connection" data-settings-section="connection"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="m9.4 14.6-1.8 1.8a4 4 0 0 1-5.7-5.7l4-4a4 4 0 0 1 5.7 0m3 2.7 1.8-1.8a4 4 0 0 1 5.7 5.7l-4 4a4 4 0 0 1-5.7 0m-6-1.5 8-8"/></svg><span>连接</span></a>
+    <a class="nav-item" href="#appearance" data-settings-section="appearance"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3a9 9 0 1 0 0 18h1.2a2.4 2.4 0 0 0 1.6-4.2 1.7 1.7 0 0 1 1.2-3h1.1A4.9 4.9 0 0 0 22 9c0-3.3-4.5-6-10-6Z"/><circle cx="7.5" cy="10" r="1"/><circle cx="11" cy="6.8" r="1"/><circle cx="16" cy="7.8" r="1"/></svg><span>外观</span></a>
+  </nav>
+  <div class="toast-region" id="toast-region" role="status" aria-live="polite" aria-atomic="true"></div>
+  <script src="./settings-layout.js" defer></script>
+  <script src="./settings.js" defer></script>
+</body>
+</html>

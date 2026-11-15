@@ -1,0 +1,897 @@
+"""顺言本机 HTTP 服务，提供配对控制 API 与受限的 PCM 音频转接。"""
+
+from __future__ import annotations
+
+import argparse
+import atexit
+import hashlib
+import hmac
+import ipaddress
+import json
+import mimetypes
+import os
+import secrets
+import socket
+import signal
+import ssl
+import sys
+import threading
+import time
+import uuid
+from collections import OrderedDict, defaultdict, deque
+from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
+from pathlib import Path
+from typing import Any
+from urllib.parse import unquote, urlsplit
+
+from host import __version__
+from host.adapters import KeyboardAdapter, validate_key_sequence
+from host.audio import AudioRouteError, AudioRouter, MAX_CHUNK_BYTES, MIN_CHUNK_BYTES
+from host.config_store import ConfigStore
+
+
+PAIR_CODE_TTL_SECONDS = 300
+PAIR_ATTEMPT_WINDOW_SECONDS = 60
+PAIR_ATTEMPT_LIMIT = 5
+SESSION_TTL_SECONDS = 24 * 60 * 60
+SESSION_IDLE_SECONDS = 6
+ACTIVE_PRESS_LEASE_SECONDS = 3
+MAX_REQUEST_BYTES = 64 * 1024
+MAX_CONFIG_REQUEST_BYTES = 1_100_000
+REQUEST_CACHE_SIZE = 512
+REQUEST_CACHE_MAX_BYTES = 2 * 1024 * 1024
+WEB_ROOT = Path(__file__).resolve().parent.parent / "web"
+
+
+def _platform_name() -> str:
+    if sys.platform == "win32":
+        return "windows"
+    if sys.platform == "darwin":
+        return "macos"
+    return "unsupported"
+
+
+class _UnavailableKeyboardAdapter:
+    def __init__(self, reason: str) -> None:
+        self.reason = reason
+
+    def press_key(self, name: str) -> None:
+        raise OSError(self.reason)
+
+    def release_key(self, name: str) -> None:
+        raise OSError(self.reason)
+
+    def tap(self, keys: list[str] | tuple[str, ...]) -> None:
+        raise OSError(self.reason)
+
+    def release_all(self) -> None:
+        return None
+
+    def permission_status(self) -> dict[str, object]:
+        return {"available": False, "status": "unavailable", "message": self.reason}
+
+
+def create_keyboard_adapter() -> KeyboardAdapter:
+    if sys.platform == "win32":
+        from host.adapters.windows_keyboard import WindowsKeyboardAdapter
+
+        return WindowsKeyboardAdapter()
+    if sys.platform == "darwin":
+        try:
+            from host.adapters.macos_keyboard import MacOSKeyboardAdapter
+
+            return MacOSKeyboardAdapter()
+        except (ImportError, OSError) as exc:
+            return _UnavailableKeyboardAdapter(f"macOS 键盘适配器不可用：{type(exc).__name__}")  # type: ignore[return-value]
+    return _UnavailableKeyboardAdapter("当前操作系统尚未实现键盘适配器")  # type: ignore[return-value]
+
+
+def _loopback_address(address: str) -> bool:
+    try:
+        parsed = ipaddress.ip_address(address.split("%", 1)[0])
+        if isinstance(parsed, ipaddress.IPv6Address) and parsed.ipv4_mapped:
+            parsed = parsed.ipv4_mapped
+        return parsed.is_loopback
+    except ValueError:
+        return False
+
+
+def _same_ip(first: str, second: str) -> bool:
+    try:
+        left = ipaddress.ip_address(first.split("%", 1)[0])
+        right = ipaddress.ip_address(second.split("%", 1)[0])
+        if isinstance(left, ipaddress.IPv6Address) and left.ipv4_mapped:
+            left = left.ipv4_mapped
+        if isinstance(right, ipaddress.IPv6Address) and right.ipv4_mapped:
+            right = right.ipv4_mapped
+        return left == right
+    except ValueError:
+        return False
+
+
+def _same_origin(origin: str, host_header: str, secure: bool) -> bool:
+    try:
+        parsed_origin = urlsplit(origin)
+        parsed_host = urlsplit("//" + host_header)
+        if parsed_origin.scheme not in {"http", "https"} or not parsed_origin.hostname or not parsed_host.hostname:
+            return False
+        if parsed_origin.username or parsed_origin.password or parsed_origin.path not in {"", "/"}:
+            return False
+        expected_scheme = "https" if secure else "http"
+        if parsed_origin.scheme != expected_scheme or parsed_origin.hostname.lower() != parsed_host.hostname.lower():
+            return False
+        origin_port = parsed_origin.port or (443 if parsed_origin.scheme == "https" else 80)
+        host_port = parsed_host.port or (443 if secure else 80)
+        return origin_port == host_port
+    except ValueError:
+        return False
+
+
+def _request_id(value: object) -> str:
+    if not isinstance(value, str):
+        raise ValueError("requestId 必须是 UUID")
+    try:
+        return str(uuid.UUID(value))
+    except (ValueError, AttributeError) as exc:
+        raise ValueError("requestId 必须是 UUID") from exc
+
+
+class HostState:
+    def __init__(self, adapter: KeyboardAdapter, config: ConfigStore, audio: AudioRouter | None = None) -> None:
+        self.adapter = adapter
+        self.config = config
+        self.audio = audio or AudioRouter()
+        self.lock = threading.RLock()
+        self.pair_code: str | None = None
+        self.pair_code_expires = 0.0
+        self.session_token: str | None = None
+        self.session_created = 0.0
+        self.last_request_at = 0.0
+        self.pair_attempts: dict[str, deque[float]] = defaultdict(deque)
+        self.request_cache: OrderedDict[tuple[str, str], tuple[int, dict[str, Any]]] = OrderedDict()
+        self.request_cache_bytes = 0
+        self.voice_active = False
+        self.voice_mode_active: str | None = None
+        self.voice_stop_keys: tuple[str, ...] = ()
+        self.active_button: str | None = None
+        self.active_keys: tuple[str, ...] = ()
+        self.active_press_at = 0.0
+        self._new_pair_code_locked()
+
+    def _new_pair_code_locked(self) -> str:
+        self.pair_code = f"{secrets.randbelow(1_000_000):06d}"
+        self.pair_code_expires = time.monotonic() + PAIR_CODE_TTL_SECONDS
+        return self.pair_code
+
+    def pairing_code(self) -> tuple[str, int]:
+        with self.lock:
+            if self.pair_code is None or time.monotonic() >= self.pair_code_expires:
+                return "", 0
+            code = self.pair_code
+            remaining = int(self.pair_code_expires - time.monotonic())
+            return code, remaining
+
+    def rotate_pairing_code(self) -> tuple[str, int]:
+        with self.lock:
+            code = self._new_pair_code_locked()
+            return code, PAIR_CODE_TTL_SECONDS
+
+    def pair(self, code: object, client_ip: str) -> tuple[str, dict[str, object]]:
+        now = time.monotonic()
+        with self.lock:
+            attempts = self.pair_attempts[client_ip]
+            while attempts and now - attempts[0] > PAIR_ATTEMPT_WINDOW_SECONDS:
+                attempts.popleft()
+            if len(attempts) >= PAIR_ATTEMPT_LIMIT:
+                raise HostError(429, "PAIR_RATE_LIMITED", "配对尝试过多，请稍后再试")
+            attempts.append(now)
+            valid = (
+                isinstance(code, str)
+                and self.pair_code is not None
+                and now < self.pair_code_expires
+                and hmac.compare_digest(code, self.pair_code)
+            )
+            if not valid:
+                raise HostError(401, "INVALID_PAIR_CODE", "配对码无效或已过期")
+
+            self._release_locked()
+            token = secrets.token_urlsafe(32)
+            self.session_token = token
+            self.session_created = now
+            self.last_request_at = now
+            self.request_cache.clear()
+            self.request_cache_bytes = 0
+            self.pair_code = None
+            self.pair_code_expires = 0.0
+            return token, {"platform": _platform_name(), "label": "Shunyan Host"}
+
+    def authorize(self, header: str | None) -> str:
+        if not header or not header.startswith("Bearer "):
+            raise HostError(401, "NOT_PAIRED", "请先配对本机服务")
+        token = header[7:].strip()
+        if not token:
+            raise HostError(401, "NOT_PAIRED", "请先配对本机服务")
+        with self.lock:
+            if self.session_token is None or not hmac.compare_digest(token, self.session_token):
+                raise HostError(401, "NOT_PAIRED", "请先配对本机服务")
+            now = time.monotonic()
+            if now - self.session_created >= SESSION_TTL_SECONDS:
+                self._release_locked()
+                self.session_token = None
+                raise HostError(401, "SESSION_EXPIRED", "配对已过期，请重新配对")
+            self.last_request_at = now
+            return hashlib.sha256(token.encode("utf-8")).hexdigest()
+
+    def cached_result(self, session_key: str, request_id: str) -> tuple[int, dict[str, Any]] | None:
+        with self.lock:
+            result = self.request_cache.get((session_key, request_id))
+            if result is not None:
+                self.request_cache.move_to_end((session_key, request_id))
+            return result
+
+    def remember_result(self, session_key: str, request_id: str, result: tuple[int, dict[str, Any]]) -> None:
+        with self.lock:
+            key = (session_key, request_id)
+            old = self.request_cache.pop(key, None)
+            if old is not None:
+                self.request_cache_bytes -= len(json.dumps(old, ensure_ascii=False).encode("utf-8"))
+            size = len(json.dumps(result, ensure_ascii=False).encode("utf-8"))
+            if size > REQUEST_CACHE_MAX_BYTES:
+                return
+            self.request_cache[key] = result
+            self.request_cache_bytes += size
+            while (
+                len(self.request_cache) > REQUEST_CACHE_SIZE
+                or self.request_cache_bytes > REQUEST_CACHE_MAX_BYTES
+            ):
+                _, evicted = self.request_cache.popitem(last=False)
+                self.request_cache_bytes -= len(json.dumps(evicted, ensure_ascii=False).encode("utf-8"))
+
+    def get_config(self) -> dict[str, Any]:
+        with self.lock:
+            return self.config.get()
+
+    def put_config(self, config: object) -> dict[str, Any]:
+        with self.lock:
+            previous = self.config.get()
+            saved = self.config.put(config)
+            if previous["audio"]["outputDeviceId"] != saved["audio"]["outputDeviceId"]:
+                self.audio.stop()
+            return saved
+
+    def _tap_locked(self, keys: list[str]) -> None:
+        self.adapter.tap(keys)
+
+    def _press_locked(self, button: str, keys: tuple[str, ...]) -> None:
+        if self.active_button is not None:
+            if self.active_button == button and self.active_keys == keys:
+                self.active_press_at = time.monotonic()
+                return
+            self._release_locked()
+        pressed: list[str] = []
+        try:
+            for key in keys:
+                self.adapter.press_key(key)
+                pressed.append(key)
+        except Exception:
+            for key in reversed(pressed):
+                try:
+                    self.adapter.release_key(key)
+                except Exception:
+                    pass
+            self._release_locked()
+            raise
+        self.active_button = button
+        self.active_keys = keys
+        self.active_press_at = time.monotonic()
+
+    def _release_locked(self) -> None:
+        failure: Exception | None = None
+        self.audio.stop()
+        was_toggle_voice = self.voice_active and self.voice_mode_active == "toggle"
+        stop_keys = self.voice_stop_keys
+        # 先消费活动状态再发停止热键，保证重复 release-all/cancel 不会重复触发 toggle。
+        self.voice_active = False
+        self.voice_mode_active = None
+        self.voice_stop_keys = ()
+        if was_toggle_voice and stop_keys:
+            try:
+                self.adapter.tap(stop_keys)
+            except Exception as exc:
+                failure = exc
+        for key in reversed(self.active_keys):
+            try:
+                self.adapter.release_key(key)
+            except Exception as exc:
+                if failure is None:
+                    failure = exc
+        try:
+            self.adapter.release_all()
+        except Exception as exc:
+            if failure is None:
+                failure = exc
+        finally:
+            self.active_button = None
+            self.active_keys = ()
+            self.active_press_at = 0.0
+        if failure is not None:
+            raise failure
+
+    def release_all(self) -> None:
+        with self.lock:
+            self._release_locked()
+
+    def control(self, button: object, phase: object) -> dict[str, object]:
+        if not isinstance(button, str) or button not in {"voice", "confirm", "cancel"}:
+            raise HostError(400, "INVALID_BUTTON", "不支持的按键")
+        if not isinstance(phase, str) or phase not in {"tap", "press", "release"}:
+            raise HostError(400, "INVALID_PHASE", "不支持的触发阶段")
+
+        try:
+            with self.lock:
+                config = self.config.get()
+                mappings = config["mappings"]
+                if button == "voice":
+                    if config["voiceMode"] == "toggle":
+                        if phase != "tap":
+                            raise HostError(400, "INVALID_PHASE", "点按模式只接受 tap")
+                        if self.voice_active:
+                            self._release_locked()
+                        else:
+                            self._tap_locked(mappings["voiceStart"])
+                            self.voice_active = True
+                            self.voice_mode_active = "toggle"
+                            self.voice_stop_keys = tuple(validate_key_sequence(mappings["voiceStop"]))
+                    else:
+                        if phase == "press":
+                            if self.voice_active and self.voice_mode_active == "toggle":
+                                self._release_locked()
+                            sequence = validate_key_sequence(mappings["voiceStart"])
+                            self._press_locked("voice", sequence)
+                            self.voice_active = True
+                            self.voice_mode_active = "hold"
+                            self.voice_stop_keys = ()
+                        elif phase == "release":
+                            if self.voice_active:
+                                self._release_locked()
+                        else:
+                            raise HostError(400, "INVALID_PHASE", "长按模式只接受 press 或 release")
+                elif phase != "tap":
+                    raise HostError(400, "INVALID_PHASE", "确认和取消只接受 tap")
+                elif button == "cancel":
+                    if self.voice_active or self.active_button is not None:
+                        self._release_locked()
+                    self._tap_locked(mappings["cancel"])
+                else:
+                    self._tap_locked(mappings["confirm"])
+                return {"button": button, "phase": phase, "voiceActive": self.voice_active}
+        except HostError:
+            raise
+        except PermissionError as exc:
+            try:
+                self.release_all()
+            except Exception:
+                pass
+            raise HostError(403, "PLATFORM_PERMISSION_REQUIRED", "系统键盘授权不足，请检查系统权限") from exc
+        except OSError as exc:
+            winerror = getattr(exc, "winerror", None)
+            try:
+                self.release_all()
+            except Exception:
+                pass
+            if winerror == 5:
+                raise HostError(403, "PLATFORM_PERMISSION_REQUIRED", "系统拒绝了键盘事件，请检查权限或目标程序权限") from exc
+            raise HostError(503, "KEYBOARD_UNAVAILABLE", "当前系统无法发送键盘事件") from exc
+        except Exception as exc:
+            try:
+                self.release_all()
+            except Exception:
+                pass
+            adapter_code = getattr(exc, "code", None)
+            if adapter_code == "PLATFORM_PERMISSION_REQUIRED":
+                raise HostError(403, "PLATFORM_PERMISSION_REQUIRED", "请先在 macOS 系统设置中允许键盘事件") from exc
+            if isinstance(adapter_code, str):
+                raise HostError(503, adapter_code, "平台键盘适配器未能发送按键") from exc
+            raise HostError(500, "KEYBOARD_ERROR", "键盘操作失败，已尝试释放按键") from exc
+
+    def status(self) -> dict[str, object]:
+        with self.lock:
+            try:
+                keyboard = dict(self.adapter.permission_status())
+                keyboard.setdefault("available", keyboard.get("supported", False))
+                if keyboard.get("authorized") is True:
+                    keyboard.setdefault("status", "ready")
+                elif keyboard.get("code") == "PLATFORM_PERMISSION_REQUIRED":
+                    keyboard.setdefault("status", "permission_required")
+                else:
+                    keyboard.setdefault("status", "unavailable")
+            except Exception:
+                keyboard = {"available": False, "status": "unavailable", "message": "键盘适配器状态读取失败"}
+            codex = {
+                "state": "unknown",
+                "title": "等待状态源",
+                "detail": "首版尚未连接可验证的 Codex 只读事件源",
+                "updatedAt": None,
+                "source": "none",
+            }
+            return {
+                "host": {"platform": _platform_name(), "keyboard": keyboard},
+                "audio": self.audio.status(self.config.get()["audio"]["outputDeviceId"]),
+                "codex": codex,
+                "voiceActive": self.voice_active,
+            }
+
+    def idle_reaper(self) -> None:
+        with self.lock:
+            now = time.monotonic()
+            stale_press = (
+                self.active_button is not None
+                and now - self.active_press_at >= ACTIVE_PRESS_LEASE_SECONDS
+            )
+            stale_session_voice = (
+                self.voice_active
+                and self.voice_mode_active == "toggle"
+                and now - self.last_request_at >= SESSION_IDLE_SECONDS
+            )
+            if stale_press or stale_session_voice:
+                try:
+                    self._release_locked()
+                except Exception:
+                    # 平台释放失败不能终止租约监视线程；后续循环继续尝试处理新状态。
+                    return
+            else:
+                self.audio.reap_idle(now)
+
+
+class HostError(Exception):
+    def __init__(self, status: int, code: str, message: str) -> None:
+        super().__init__(message)
+        self.status = status
+        self.code = code
+        self.message = message
+
+
+class HostHTTPServer(ThreadingHTTPServer):
+    daemon_threads = True
+    allow_reuse_address = True
+
+    def __init__(self, server_address: tuple[str, int], state: HostState, secure: bool) -> None:
+        self.state = state
+        self.secure = secure
+        self.address_family = socket.AF_INET6 if ":" in server_address[0] else socket.AF_INET
+        super().__init__(server_address, HostRequestHandler)
+
+    def server_close(self) -> None:
+        try:
+            try:
+                self.state.release_all()
+            except Exception:
+                # 退出时仍继续关闭监听套接字；适配器已在 release_all 中尽力清理。
+                pass
+        finally:
+            super().server_close()
+
+
+class HostRequestHandler(BaseHTTPRequestHandler):
+    server: HostHTTPServer
+    protocol_version = "HTTP/1.1"
+
+    def log_message(self, format: str, *args: object) -> None:
+        # http.server 默认日志包含 URL 和错误内容；服务有令牌与配对流程，首版不输出请求日志。
+        return
+
+    def _send_json(self, status: int, payload: dict[str, Any]) -> None:
+        body = json.dumps(payload, ensure_ascii=False, separators=(",", ":")).encode("utf-8")
+        if status >= 400:
+            # 错误路径可能尚未消费完请求体，关闭连接避免把残余字节解析成下一条请求。
+            self.close_connection = True
+        self.send_response(status)
+        self.send_header("Content-Type", "application/json; charset=utf-8")
+        self.send_header("Content-Length", str(len(body)))
+        self.send_header("Cache-Control", "no-store")
+        self.send_header("X-Content-Type-Options", "nosniff")
+        self.send_header("Referrer-Policy", "no-referrer")
+        self.send_header("X-Frame-Options", "DENY")
+        if status >= 400:
+            self.send_header("Connection", "close")
+        self.end_headers()
+        try:
+            self.wfile.write(body)
+        except (BrokenPipeError, ConnectionResetError):
+            return
+
+    def _ok(self, data: dict[str, Any], status: int = 200) -> None:
+        self._send_json(status, {"ok": True, "data": data})
+
+    def _fail(self, error: HostError) -> None:
+        self._send_json(error.status, {"ok": False, "error": {"code": error.code, "message": error.message}})
+
+    def _origin_allowed(self) -> bool:
+        origin = self.headers.get("Origin")
+        if origin is None:
+            return True
+        return _same_origin(origin, self.headers.get("Host", ""), self.server.secure)
+
+    def _read_json(self, max_bytes: int = MAX_REQUEST_BYTES) -> dict[str, Any]:
+        content_type = self.headers.get_content_type()
+        if content_type != "application/json":
+            raise HostError(415, "UNSUPPORTED_MEDIA_TYPE", "请求必须使用 application/json")
+        raw_length = self.headers.get("Content-Length")
+        try:
+            length = int(raw_length or "")
+        except ValueError as exc:
+            raise HostError(411, "LENGTH_REQUIRED", "缺少有效的 Content-Length") from exc
+        if length < 0 or length > max_bytes:
+            raise HostError(413, "REQUEST_TOO_LARGE", "请求体过大")
+        try:
+            body = self.rfile.read(length)
+            parsed = json.loads(body.decode("utf-8"))
+        except (UnicodeDecodeError, json.JSONDecodeError) as exc:
+            raise HostError(400, "INVALID_JSON", "JSON 格式无效") from exc
+        if not isinstance(parsed, dict):
+            raise HostError(400, "INVALID_JSON", "JSON 请求体必须是对象")
+        return parsed
+
+    def _read_audio_chunk(self) -> bytes:
+        if self.headers.get_content_type() != "application/octet-stream":
+            raise HostError(415, "UNSUPPORTED_MEDIA_TYPE", "音频分片必须使用 application/octet-stream")
+        if self.headers.get("Transfer-Encoding"):
+            raise HostError(400, "INVALID_AUDIO_CHUNK", "音频分片不接受分块传输编码")
+        try:
+            length = int(self.headers.get("Content-Length") or "")
+        except ValueError as exc:
+            raise HostError(411, "LENGTH_REQUIRED", "音频分片缺少有效长度") from exc
+        if length < MIN_CHUNK_BYTES or length > MAX_CHUNK_BYTES or length % 2:
+            raise HostError(413, "INVALID_AUDIO_CHUNK", "音频分片大小无效")
+        body = self.rfile.read(length)
+        if len(body) != length:
+            raise HostError(400, "INVALID_AUDIO_CHUNK", "音频分片不完整")
+        return body
+
+    def _authorized(self) -> str:
+        if not self._origin_allowed():
+            raise HostError(403, "ORIGIN_NOT_ALLOWED", "请求来源不受允许")
+        if not self.server.secure and not self._local_pairing_client():
+            raise HostError(426, "HTTPS_REQUIRED", "局域网控制需要可信 HTTPS 连接")
+        return self.server.state.authorize(self.headers.get("Authorization"))
+
+    def _idempotent_start(
+        self, body: dict[str, Any]
+    ) -> tuple[str, str, tuple[int, dict[str, Any]] | None]:
+        try:
+            request_id = _request_id(body.get("requestId"))
+        except ValueError as exc:
+            raise HostError(400, "INVALID_REQUEST_ID", "requestId 必须是 UUID") from exc
+        session_key = self._authorized()
+        return request_id, session_key, self.server.state.cached_result(session_key, request_id)
+
+    def _idempotent_finish(self, session_key: str, request_id: str, status: int, data: dict[str, Any]) -> None:
+        self.server.state.remember_result(session_key, request_id, (status, data))
+
+    def _dispatch_get(self) -> None:
+        parsed = urlsplit(self.path)
+        path = unquote(parsed.path)
+        if path == "/api/v1/health":
+            if not self._origin_allowed():
+                raise HostError(403, "ORIGIN_NOT_ALLOWED", "请求来源不受允许")
+            audio = self.server.state.audio.status(self.server.state.get_config()["audio"]["outputDeviceId"])
+            self._ok(
+                {
+                    "version": __version__,
+                    "platform": _platform_name(),
+                    "pairingAvailable": True,
+                    "secureTransport": self.server.secure,
+                    "secureContext": self.server.secure,
+                    "microphoneAvailable": None,
+                    "microphonePermissionOwner": "mobile-browser",
+                    "audioAvailable": audio["available"],
+                    "audioState": audio["state"],
+                    "codexStatusAvailable": False,
+                }
+            )
+            return
+        if path == "/api/v1/pairing-code":
+            if not self._local_pairing_client():
+                raise HostError(403, "LOOPBACK_ONLY", "配对码仅可在本机访问")
+            if not self._origin_allowed():
+                raise HostError(403, "ORIGIN_NOT_ALLOWED", "请求来源不受允许")
+            code, ttl = self.server.state.pairing_code()
+            self._ok({"pairCode": code or None, "expiresIn": ttl, "singleUse": True, "available": bool(code)})
+            return
+        if path == "/api/v1/config":
+            with self.server.state.lock:
+                self._authorized()
+                self._ok(self.server.state.get_config())
+            return
+        if path == "/api/v1/status":
+            with self.server.state.lock:
+                self._authorized()
+                self._ok(self.server.state.status())
+            return
+        if path == "/api/v1/audio/devices":
+            self._authorized()
+            try:
+                devices = self.server.state.audio.devices()
+            except AudioRouteError as exc:
+                raise HostError(503, exc.code, exc.message) from exc
+            config = self.server.state.get_config()
+            self._ok({"available": True, "devices": devices, "selectedDeviceId": config["audio"]["outputDeviceId"]})
+            return
+        if path.startswith("/api/"):
+            raise HostError(404, "NOT_FOUND", "API 路径不存在")
+        self._serve_static(path)
+
+    def _serve_static(self, path: str) -> None:
+        if not WEB_ROOT.is_dir():
+            raise HostError(503, "WEB_NOT_BUILT", "尚未找到 web 前端文件")
+        relative = path.lstrip("/") or "index.html"
+        target = (WEB_ROOT / relative).resolve()
+        try:
+            target.relative_to(WEB_ROOT.resolve())
+        except ValueError as exc:
+            raise HostError(404, "NOT_FOUND", "页面不存在") from exc
+        if target.is_dir():
+            target = target / "index.html"
+        if not target.is_file():
+            raise HostError(404, "NOT_FOUND", "页面不存在")
+        try:
+            body = target.read_bytes()
+        except OSError as exc:
+            raise HostError(500, "STATIC_READ_FAILED", "页面读取失败") from exc
+        content_type, _ = mimetypes.guess_type(target.name)
+        if content_type and content_type.startswith("text/"):
+            content_type += "; charset=utf-8"
+        self.send_response(200)
+        self.send_header("Content-Type", content_type or "application/octet-stream")
+        self.send_header("Content-Length", str(len(body)))
+        self.send_header("Cache-Control", "no-store")
+        self.send_header("X-Content-Type-Options", "nosniff")
+        self.send_header("Referrer-Policy", "no-referrer")
+        self.send_header("X-Frame-Options", "DENY")
+        self.end_headers()
+        try:
+            self.wfile.write(body)
+        except (BrokenPipeError, ConnectionResetError):
+            return
+
+    def _local_pairing_client(self) -> bool:
+        if _loopback_address(self.client_address[0]):
+            return True
+        return _same_ip(self.client_address[0], str(self.server.server_address[0]))
+
+    def _dispatch_post(self) -> None:
+        path = urlsplit(self.path).path
+        if path == "/api/v1/pairing-code/rotate":
+            if not self._local_pairing_client():
+                raise HostError(403, "LOOPBACK_ONLY", "配对码只能在本机更新")
+            if not self._origin_allowed():
+                raise HostError(403, "ORIGIN_NOT_ALLOWED", "请求来源不受允许")
+            if self.headers.get("Transfer-Encoding"):
+                raise HostError(400, "INVALID_ROTATE_REQUEST", "更新配对码不接受请求体")
+            raw_length = self.headers.get("Content-Length")
+            if raw_length not in {None, "0"}:
+                body = self._read_json()
+                if body:
+                    raise HostError(400, "INVALID_ROTATE_REQUEST", "更新配对码不接受请求字段")
+            code, ttl = self.server.state.rotate_pairing_code()
+            self._ok({"pairCode": code, "expiresIn": ttl, "singleUse": True, "available": True})
+            return
+        if path == "/api/v1/pair":
+            if not self._origin_allowed():
+                raise HostError(403, "ORIGIN_NOT_ALLOWED", "请求来源不受允许")
+            if not self.server.secure and not self._local_pairing_client():
+                raise HostError(426, "HTTPS_REQUIRED", "局域网配对需要可信 HTTPS 连接")
+            body = self._read_json()
+            if set(body) != {"pairCode"}:
+                raise HostError(400, "INVALID_PAIR_REQUEST", "配对请求字段无效")
+            token, host = self.server.state.pair(body.get("pairCode"), self.client_address[0])
+            self._ok({"sessionToken": token, "host": host})
+            return
+        if path == "/api/v1/config":
+            body = self._read_json(MAX_CONFIG_REQUEST_BYTES)
+            with self.server.state.lock:
+                request_id, session_key, cached = self._idempotent_start(body)
+                if cached is not None:
+                    self._send_json(cached[0], cached[1])
+                    return
+                if set(body) != {"requestId", "config"}:
+                    raise HostError(400, "INVALID_CONFIG_REQUEST", "配置请求应包含 requestId 和 config")
+                try:
+                    config = self.server.state.put_config(body.get("config"))
+                except ValueError as exc:
+                    raise HostError(400, "INVALID_CONFIG", "配置字段无效或图片格式不受支持") from exc
+                except OSError as exc:
+                    raise HostError(500, "CONFIG_SAVE_FAILED", "配置保存失败，请检查本机磁盘权限") from exc
+                response = {"ok": True, "data": config}
+                self._idempotent_finish(session_key, request_id, 200, response)
+                self._send_json(200, response)
+            return
+        if path == "/api/v1/control":
+            body = self._read_json()
+            with self.server.state.lock:
+                request_id, session_key, cached = self._idempotent_start(body)
+                if cached is not None:
+                    self._send_json(cached[0], cached[1])
+                    return
+                if set(body) != {"requestId", "button", "phase"}:
+                    raise HostError(400, "INVALID_CONTROL_REQUEST", "控制请求应包含 requestId、button、phase")
+                data = self.server.state.control(body.get("button"), body.get("phase"))
+                response = {"ok": True, "data": data}
+                self._idempotent_finish(session_key, request_id, 200, response)
+                self._send_json(200, response)
+            return
+        if path == "/api/v1/control/release-all":
+            body = self._read_json()
+            with self.server.state.lock:
+                request_id, session_key, cached = self._idempotent_start(body)
+                if cached is not None:
+                    self._send_json(cached[0], cached[1])
+                    return
+                if set(body) != {"requestId"}:
+                    raise HostError(400, "INVALID_RELEASE_REQUEST", "释放请求应包含 requestId")
+                self.server.state.release_all()
+                response = {"ok": True, "data": {"released": True}}
+                self._idempotent_finish(session_key, request_id, 200, response)
+                self._send_json(200, response)
+            return
+        if path == "/api/v1/audio/start":
+            body = self._read_json(1024)
+            if set(body) != {"sampleRate"}:
+                raise HostError(400, "INVALID_AUDIO_REQUEST", "音频启动请求字段无效")
+            session_key = self._authorized()
+            config = self.server.state.get_config()
+            try:
+                stream = self.server.state.audio.start(
+                    session_key,
+                    body.get("sampleRate"),
+                    config["audio"]["outputDeviceId"],
+                )
+            except AudioRouteError as exc:
+                status = (
+                    400 if exc.code == "INVALID_AUDIO_FORMAT"
+                    else 409 if exc.code in {"AUDIO_DEVICE_REQUIRED", "AUDIO_DEVICE_NOT_FOUND", "AUDIO_SESSION_BUSY"}
+                    else 503
+                )
+                raise HostError(status, exc.code, exc.message) from exc
+            self._ok({"streaming": True, **stream})
+            return
+        if path == "/api/v1/audio/chunk":
+            session_key = self._authorized()
+            try:
+                sequence = int(self.headers.get("X-Audio-Sequence", ""))
+            except ValueError as exc:
+                raise HostError(400, "INVALID_AUDIO_SEQUENCE", "音频序号无效") from exc
+            pcm = self._read_audio_chunk()
+            try:
+                self.server.state.audio.write(session_key, sequence, pcm)
+            except AudioRouteError as exc:
+                status = (
+                    400 if exc.code in {"INVALID_AUDIO_CHUNK", "INVALID_AUDIO_SEQUENCE"}
+                    else 409 if exc.code in {"AUDIO_SESSION_NOT_STARTED", "AUDIO_SEQUENCE_MISMATCH"}
+                    else 503
+                )
+                raise HostError(status, exc.code, exc.message) from exc
+            self._ok({"accepted": True, "sequence": sequence})
+            return
+        if path == "/api/v1/audio/stop":
+            session_key = self._authorized()
+            if self.headers.get("Transfer-Encoding") or self.headers.get("Content-Length") not in {None, "0"}:
+                raise HostError(400, "INVALID_AUDIO_REQUEST", "音频停止请求不接受请求体")
+            self.server.state.audio.stop(session_key)
+            self._ok({"streaming": False})
+            return
+        if path.startswith("/api/"):
+            raise HostError(404, "NOT_FOUND", "API 路径不存在")
+        raise HostError(404, "NOT_FOUND", "页面不支持 POST")
+
+    def do_GET(self) -> None:
+        try:
+            self._dispatch_get()
+        except HostError as exc:
+            self._fail(exc)
+        except (BrokenPipeError, ConnectionResetError):
+            return
+        except Exception:
+            self._fail(HostError(500, "INTERNAL_ERROR", "服务处理请求失败"))
+
+    def do_POST(self) -> None:
+        try:
+            self._dispatch_post()
+        except HostError as exc:
+            self._fail(exc)
+        except (BrokenPipeError, ConnectionResetError):
+            return
+        except Exception:
+            self._fail(HostError(500, "INTERNAL_ERROR", "服务处理请求失败"))
+
+    def do_PUT(self) -> None:
+        try:
+            if urlsplit(self.path).path != "/api/v1/config":
+                raise HostError(404, "NOT_FOUND", "API 路径不存在")
+            self.do_POST()
+        except HostError as exc:
+            self._fail(exc)
+
+    def do_OPTIONS(self) -> None:
+        self._fail(HostError(405, "METHOD_NOT_ALLOWED", "不支持跨域预检请求；请通过本机服务同源访问网页"))
+
+
+def _private_bind_address(host: str) -> str:
+    try:
+        address = ipaddress.ip_address(host.split("%", 1)[0])
+    except ValueError as exc:
+        raise ValueError("--host 仅接受 127.0.0.1 或明确的私有网络 IP") from exc
+    if isinstance(address, ipaddress.IPv4Address):
+        allowed_networks = (
+            ipaddress.ip_network("10.0.0.0/8"),
+            ipaddress.ip_network("172.16.0.0/12"),
+            ipaddress.ip_network("192.168.0.0/16"),
+            ipaddress.ip_network("100.64.0.0/10"),  # Tailscale/CGNAT 地址段
+        )
+        is_local = address.is_loopback or address.is_link_local or any(address in network for network in allowed_networks)
+    else:
+        is_local = address.is_loopback or address.is_link_local or address in ipaddress.ip_network("fc00::/7")
+    if not is_local:
+        raise ValueError("为避免公网暴露，只允许绑定本机或私有网络地址")
+    if address.is_unspecified or address.is_multicast:
+        raise ValueError("不能绑定到通配或组播地址；请指定本机局域网 IP")
+    return host
+
+
+def main() -> int:
+    parser = argparse.ArgumentParser(description="顺言本机语音控制服务")
+    parser.add_argument("--host", default="127.0.0.1", help="监听本机或私有网络 IP，默认仅本机")
+    parser.add_argument("--port", type=int, default=8765, help="监听端口，默认 8765")
+    parser.add_argument("--tls-cert", help="TLS 证书 PEM 路径；使用手机麦克风时需可信 HTTPS")
+    parser.add_argument("--tls-key", help="TLS 私钥 PEM 路径")
+    args = parser.parse_args()
+    try:
+        bind_host = _private_bind_address(args.host)
+    except ValueError as exc:
+        parser.error(str(exc))
+    if not (1 <= args.port <= 65535):
+        parser.error("--port 必须在 1 到 65535 之间")
+    if bool(args.tls_cert) != bool(args.tls_key):
+        parser.error("--tls-cert 与 --tls-key 必须同时提供")
+
+    state = HostState(create_keyboard_adapter(), ConfigStore())
+    server = HostHTTPServer((bind_host, args.port), state, secure=bool(args.tls_cert))
+    if args.tls_cert and args.tls_key:
+        tls_context = ssl.SSLContext(ssl.PROTOCOL_TLS_SERVER)
+        tls_context.minimum_version = ssl.TLSVersion.TLSv1_2
+        tls_context.load_cert_chain(args.tls_cert, args.tls_key)
+        server.socket = tls_context.wrap_socket(server.socket, server_side=True)
+
+    def reap_idle_sessions() -> None:
+        while not stop_reaper.wait(1.0):
+            state.idle_reaper()
+
+    stop_reaper = threading.Event()
+    reaper = threading.Thread(target=reap_idle_sessions, name="shunyan-key-lease", daemon=True)
+    reaper.start()
+
+    def safe_release() -> None:
+        try:
+            state.release_all()
+        except Exception:
+            pass
+
+    def terminate_gracefully(_signum: int, _frame: object) -> None:
+        raise KeyboardInterrupt
+
+    atexit.register(safe_release)
+    if hasattr(signal, "SIGTERM"):
+        signal.signal(signal.SIGTERM, terminate_gracefully)
+    try:
+        # 首版只做源码。正式后台启动器应使用 pythonw/隐藏窗口或 macOS LaunchAgent。
+        server.serve_forever(poll_interval=0.5)
+    except KeyboardInterrupt:
+        pass
+    finally:
+        stop_reaper.set()
+        server.server_close()
+    return 0
+
+
+if __name__ == "__main__":
+    raise SystemExit(main())

@@ -190,11 +190,12 @@
       }
       return keys;
     };
+    const voiceMapping = parseMapping('mapping-voice-start', '语音按键');
     return {
       voiceMode,
       audio: { outputDeviceId: validAudioDeviceId($('audio-output-device').value) },
       mappings: {
-        voiceStart: parseMapping('mapping-voice-start', '语音开始'), voiceStop: parseMapping('mapping-voice-stop', '语音停止'),
+        voiceStart: [...voiceMapping], voiceStop: [...voiceMapping],
         confirm: parseMapping('mapping-confirm', '确认'), cancel: parseMapping('mapping-cancel', '取消')
       },
       appearance: {
@@ -220,8 +221,10 @@
     $('key-theme').value=config.appearance.keyTheme;
     config.appearance.keyRadius = 22;
     document.querySelector(`input[name="voice-mode"][value="${config.voiceMode}"]`).checked = true;
-    $('mapping-voice-start').value = Array.isArray(config.mappings.voiceStart) ? config.mappings.voiceStart.join('+') : 'ALT_RIGHT';
-    $('mapping-voice-stop').value = Array.isArray(config.mappings.voiceStop) ? config.mappings.voiceStop.join('+') : 'ALT_RIGHT';
+    const voiceMapping = Array.isArray(config.mappings.voiceStart)
+      ? config.mappings.voiceStart
+      : Array.isArray(config.mappings.voiceStop) ? config.mappings.voiceStop : ['ALT_RIGHT'];
+    $('mapping-voice-start').value = voiceMapping.join('+');
     $('mapping-confirm').value = Array.isArray(config.mappings.confirm) ? config.mappings.confirm.join('+') : 'ENTER';
     $('mapping-cancel').value = Array.isArray(config.mappings.cancel) ? config.mappings.cancel.join('+') : 'ESC';
     const audioSelect = $('audio-output-device');
@@ -418,7 +421,41 @@
     $(`icon-${key}`).addEventListener('change', () => { config.appearance.keys[key].iconData = null; saveDraft(); });
   }
   for (const id of ['key-theme', 'icon-voice', 'icon-confirm', 'icon-cancel', 'color-voice', 'color-confirm', 'color-cancel', 'glow-voice', 'glow-confirm', 'glow-cancel']) $(id).addEventListener('input', saveDraft);
-  for (const id of ['mapping-voice-start', 'mapping-voice-stop', 'mapping-confirm', 'mapping-cancel']) $(id).addEventListener('change', saveDraft);
+  for (const id of ['mapping-voice-start', 'mapping-confirm', 'mapping-cancel']) $(id).addEventListener('change', saveDraft);
+  const manualDialog = $('shortcut-manual-dialog');
+  const manualKey = $('shortcut-manual-key');
+  const labels = { ALT_LEFT:'左 Alt / Option', ALT_RIGHT:'右 Alt / Option', CTRL_LEFT:'左 Ctrl', CTRL_RIGHT:'右 Ctrl', SHIFT_LEFT:'左 Shift', SHIFT_RIGHT:'右 Shift', META_LEFT:'左 Command / Win', META_RIGHT:'右 Command / Win', SPACE:'空格', BACKSPACE:'退格', PAGE_UP:'Page Up', PAGE_DOWN:'Page Down', UP:'方向上', DOWN:'方向下', LEFT:'方向左', RIGHT:'方向右' };
+  manualKey.add(new Option('请选择按键', ''));
+  for (const key of VALID_KEYS) manualKey.add(new Option(labels[key] || key, key));
+  const modifierBox = $('shortcut-manual-modifiers');
+  for (const key of MODIFIERS) {
+    const label = document.createElement('label');
+    const input = document.createElement('input'); input.type = 'checkbox'; input.value = key;
+    label.append(input, document.createTextNode(labels[key])); modifierBox.append(label);
+  }
+  let manualTarget = null;
+  document.addEventListener('shunyan-shortcut-manual', (event) => {
+    const input = $(event.detail?.inputId);
+    if (!input || manualDialog.open) return;
+    manualTarget = input;
+    modifierBox.querySelectorAll('input').forEach((item) => { item.checked = false; });
+    manualKey.value = '';
+    manualDialog.showModal();
+  });
+  $('shortcut-manual-cancel').addEventListener('click', () => manualDialog.close());
+  $('shortcut-manual-confirm').addEventListener('click', () => {
+    let main = manualKey.value;
+    let modifiers = [...modifierBox.querySelectorAll('input:checked')].map((item) => item.value);
+    if (MODIFIERS.has(main)) modifiers = modifiers.filter((key) => key !== main);
+    if (!main && modifiers.length === 1) main = modifiers.pop();
+    if (!main) { toast('请选择一个按键；组合键还需选择普通按键', 'error'); return; }
+    if (modifiers.length > 4 || (modifiers.length && MODIFIERS.has(main))) {
+      toast('组合键最多包含四个修饰键，并须选择一个普通按键', 'error'); return;
+    }
+    manualDialog.close();
+    window.ShunyanShortcutRecorder.setMapping(manualTarget, [...modifiers, main].join('+'));
+    toast('按键已选择，请点击保存设置', 'success');
+  });
   document.querySelectorAll('input[name="voice-mode"]').forEach((input) => input.addEventListener('change', saveDraft));
 
   function bestEffortRelease() {

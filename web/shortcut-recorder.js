@@ -3,7 +3,6 @@
 
   const INPUT_IDS = [
     'mapping-voice-start',
-    'mapping-voice-stop',
     'mapping-confirm',
     'mapping-cancel'
   ];
@@ -11,6 +10,7 @@
     'ALT_LEFT', 'ALT_RIGHT', 'CTRL_LEFT', 'CTRL_RIGHT',
     'SHIFT_LEFT', 'SHIFT_RIGHT', 'META_LEFT', 'META_RIGHT'
   ]);
+  const ALT_KEYS = new Set(['ALT_LEFT', 'ALT_RIGHT']);
   const FRIENDLY = {
     ALT_LEFT: '左 Alt / Option', ALT_RIGHT: '右 Alt / Option',
     CTRL_LEFT: '左 Ctrl', CTRL_RIGHT: '右 Ctrl',
@@ -36,13 +36,16 @@
 
   function modifierName(event) {
     const code = String(event.code || '');
+    const key = String(event.key || '');
     let family = null;
-    if (code === 'AltLeft' || code === 'AltRight' || code === 'Alt' || code === 'AltGraph') family = 'ALT';
-    else if (code === 'ControlLeft' || code === 'ControlRight' || code === 'Control') family = 'CTRL';
-    else if (code === 'ShiftLeft' || code === 'ShiftRight' || code === 'Shift') family = 'SHIFT';
-    else if (code === 'MetaLeft' || code === 'MetaRight' || code === 'Meta' || code === 'OSLeft' || code === 'OSRight') family = 'META';
+    if (code.startsWith('Alt') || key === 'Alt' || key === 'AltGraph') family = 'ALT';
+    else if (code.startsWith('Control') || key === 'Control') family = 'CTRL';
+    else if (code.startsWith('Shift') || key === 'Shift') family = 'SHIFT';
+    else if (code.startsWith('Meta') || code.startsWith('OS') || key === 'Meta' || key === 'OS') family = 'META';
     if (!family) return null;
-    const side = code === 'AltGraph' ? 'RIGHT' : locationSide(event, code);
+    const side = code === 'AltGraph' || key === 'AltGraph'
+      ? 'RIGHT'
+      : locationSide(event, code);
     return side ? `${family}_${side}` : null;
   }
 
@@ -59,11 +62,23 @@
       Home: 'HOME', End: 'END', PageUp: 'PAGE_UP', PageDown: 'PAGE_DOWN',
       ArrowUp: 'UP', ArrowDown: 'DOWN', ArrowLeft: 'LEFT', ArrowRight: 'RIGHT'
     };
-    return named[code] || null;
+    if (named[code]) return named[code];
+    const key = String(event.key || '');
+    const keyFallback = {
+      Enter: 'ENTER', Escape: 'ESC', Tab: 'TAB', ' ': 'SPACE',
+      Backspace: 'BACKSPACE', Delete: 'DELETE', Home: 'HOME', End: 'END',
+      PageUp: 'PAGE_UP', PageDown: 'PAGE_DOWN',
+      ArrowUp: 'UP', ArrowDown: 'DOWN', ArrowLeft: 'LEFT', ArrowRight: 'RIGHT'
+    };
+    if (keyFallback[key]) return keyFallback[key];
+    if (/^[a-z]$/i.test(key)) return key.toUpperCase();
+    if (/^[0-9]$/.test(key)) return key;
+    if (/^F(?:[1-9]|1[0-2])$/.test(key)) return key;
+    return null;
   }
 
   function physicalIdentity(event) {
-    return `${String(event.code || 'Unidentified')}:${Number(event.location) || 0}`;
+    return `${String(event.code || event.key || 'Unidentified')}:${Number(event.location) || 0}`;
   }
 
   function friendlyKey(key) {
@@ -98,18 +113,11 @@
     entry.display.removeAttribute('data-recording');
   }
 
-  function updateOverlayPosition(entry) {
-    const field = entry.field;
-    const fieldRect = field.getBoundingClientRect();
-    const inputRect = entry.input.getBoundingClientRect();
-    entry.display.style.left = `${inputRect.left - fieldRect.left}px`;
-    entry.display.style.top = `${inputRect.top - fieldRect.top}px`;
-    entry.display.style.width = `${inputRect.width}px`;
-    entry.display.style.height = `${inputRect.height}px`;
-  }
-
   function cancel(entry) {
     if (!entry || !entry.state.recording) return;
+    clearTimeout(entry.state.waitTimer);
+    clearTimeout(entry.state.focusLossTimer);
+    entry.state.focusLossTimer = 0;
     entry.state.recording = false;
     entry.state.down.clear();
     entry.state.ignoredDown.clear();
@@ -127,6 +135,16 @@
     entry.state.keys = [];
     activeEntry = entry;
     render(entry);
+    entry.state.waitTimer = setTimeout(() => {
+      if (activeEntry !== entry || !entry.state.recording || entry.state.keys.length) return;
+      cancel(entry);
+      requestManual(entry);
+    }, 5000);
+  }
+
+  function requestManual(entry) {
+    const EventCtor = window.CustomEvent || CustomEvent;
+    document.dispatchEvent(new EventCtor('shunyan-shortcut-manual', { detail: { inputId: entry.input.id } }));
   }
 
   function finish(entry) {
@@ -151,6 +169,9 @@
     }
 
     entry.state.recording = false;
+    clearTimeout(entry.state.waitTimer);
+    clearTimeout(entry.state.focusLossTimer);
+    entry.state.focusLossTimer = 0;
     entry.state.down.clear();
     entry.state.ignoredDown.clear();
     entry.state.keys = [];
@@ -159,6 +180,29 @@
     render(entry);
     entry.input.dispatchEvent(new Event('input', { bubbles: true }));
     entry.input.dispatchEvent(new Event('change', { bubbles: true }));
+    dispatchFeedback(`已录入：${friendlyMapping(entry.input.value)}`, 'success');
+  }
+
+  function deferFocusLoss(entry) {
+    if (!entry || !entry.state.recording || entry.state.focusLossTimer) return;
+    const keys = [...new Set(entry.state.keys)];
+    const awaitingAltRelease = keys.length === 1 && entry.state.down.size === 1 && ALT_KEYS.has(keys[0]);
+    if (!awaitingAltRelease) {
+      const hadPartialInput = keys.length > 0;
+      cancel(entry);
+      dispatchFeedback(
+        hadPartialInput
+          ? '按键录入已中断，请重新点击输入框后再试'
+          : '没有捕获到按键，请重新点击输入框后再按一次；系统保留的快捷键可能会被拦截',
+        'warning'
+      );
+      return;
+    }
+    entry.state.focusLossTimer = setTimeout(() => {
+      entry.state.focusLossTimer = 0;
+      if (activeEntry !== entry || !entry.state.recording) return;
+      finish(entry);
+    }, 180);
   }
 
   function stopEvent(event) {
@@ -168,16 +212,19 @@
 
   function handleKeyDown(event) {
     const entry = activeEntry;
-    if (!entry || !entry.state.recording || document.activeElement !== entry.input) return;
+    if (!entry || !entry.state.recording) return;
+    clearTimeout(entry.state.focusLossTimer);
+    entry.state.focusLossTimer = 0;
     stopEvent(event);
     if (event.repeat) return;
 
     const name = keyName(event);
     if (!name) {
       cancel(entry);
-      dispatchFeedback('此按键暂不支持录入');
+      requestManual(entry);
       return;
     }
+    clearTimeout(entry.state.waitTimer);
     const identity = physicalIdentity(event);
     if (entry.state.down.has(identity)) return;
     if (isAltGraph(event)) {
@@ -207,7 +254,7 @@
 
   function handleKeyUp(event) {
     const entry = activeEntry;
-    if (!entry || !entry.state.recording || document.activeElement !== entry.input) return;
+    if (!entry || !entry.state.recording) return;
     stopEvent(event);
     const identity = physicalIdentity(event);
     if (entry.state.ignoredDown.delete(identity)) return;
@@ -243,20 +290,7 @@
     document.addEventListener('visibilitychange', () => {
       if (document.hidden) cancel(activeEntry);
     });
-    window.addEventListener('blur', () => cancel(activeEntry));
-    window.addEventListener('resize', () => {
-      INPUT_IDS.forEach((id) => {
-        const entry = document.getElementById(id) && attached.get(document.getElementById(id));
-        if (entry) updateOverlayPosition(entry);
-      });
-    });
-    window.addEventListener('orientationchange', () => {
-      INPUT_IDS.forEach((id) => {
-        const input = document.getElementById(id);
-        const entry = input && attached.get(input);
-        if (entry) updateOverlayPosition(entry);
-      });
-    });
+    window.addEventListener('blur', () => deferFocusLoss(activeEntry));
     window.addEventListener('pagehide', () => cancel(activeEntry));
   }
 
@@ -289,7 +323,7 @@
       input,
       field,
       display,
-      state: { recording: false, down: new Map(), ignoredDown: new Set(), keys: [] }
+      state: { recording: false, down: new Map(), ignoredDown: new Set(), keys: [], focusLossTimer: 0, waitTimer: 0 }
     };
     attached.set(input, entry);
     input.readOnly = true;
@@ -298,13 +332,12 @@
     input.setAttribute('aria-description', '点击或聚焦后按下快捷键。手机需要连接实体键盘录入。部分布局会将 Ctrl+右 Alt 报告为 AltGraph，此时会按右 Alt 录入。');
     watchValue(entry);
     render(entry);
-    requestAnimationFrame(() => updateOverlayPosition(entry));
 
     input.addEventListener('focus', () => begin(entry));
     input.addEventListener('pointerdown', (event) => {
       if (event.button === 0) begin(entry);
     });
-    input.addEventListener('blur', () => cancel(entry));
+    input.addEventListener('blur', () => deferFocusLoss(entry));
   }
 
   function init() {
@@ -312,7 +345,16 @@
     installListeners();
   }
 
-  window.ShunyanShortcutRecorder = { init };
+  window.ShunyanShortcutRecorder = {
+    init,
+    setMapping(input, value) {
+      const entry = attached.get(input);
+      if (entry) cancel(entry);
+      input.value = value;
+      if (entry) render(entry);
+      input.dispatchEvent(new Event('change', { bubbles: true }));
+    }
+  };
   if (document.readyState === 'loading') {
     document.addEventListener('DOMContentLoaded', init, { once: true });
   } else {

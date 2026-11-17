@@ -66,7 +66,7 @@
   if(name==='reset'){step=0;completed=0;installed=paired=signal=target=false;daily=false;render();}
   if(name==='add-phone'){daily=false;step=1;render();}
   if(name==='sound'){daily=false;step=2;render();}
-  if(name==='shortcuts')openDialog('快捷键与录音',`<div class="choice-row"><button class="btn selected" data-mode="toggle">点按切换</button><button class="btn" data-mode="hold">按住说话</button></div><div class="field-stack">${[['语音开始','右 Alt'],['语音停止','右 Alt'],['确认','Enter'],['取消','Esc']].map(([label,value])=>`<label>${label}<input value="${value}" readonly></label>`).join('')}</div><p>正式产品点击输入框后，用实体键盘录入，不需要手动输入键名。</p>`,`<button class="btn primary" data-action="dialog-close">完成预览</button>`);
+  if(name==='shortcuts')openDialog('快捷键与录音',`<div class="choice-row"><button class="btn selected" data-mode="toggle">点按切换</button><button class="btn" data-mode="hold">按住说话</button></div><div class="field-stack">${[['语音按键','右 Alt'],['确认','Enter'],['取消','Esc']].map(([label,value])=>`<label>${label}<input value="${value}" readonly></label>`).join('')}</div><p>正式产品点击输入框后，用实体键盘录入，不需要手动输入键名。点按模式用同一个语音按键开始和停止。</p>`,`<button class="btn primary" data-action="dialog-close">完成预览</button>`);
   if(name==='codex')openDialog('Codex 状态 · 可选',`<p>仅在需要查看 Codex 实时反馈时连接，不影响手机语音使用。</p><div class="mobile-simple-row"><span>Codex 连接组件</span><span class="status pending">待启用</span></div><p>正式产品会自动安装并检测组件，再列出真实的会话标题。</p>`,`<button class="btn" data-action="dialog-close">稍后</button><button class="btn primary" data-action="mock-codex">预览连接成功</button>`);
   if(name==='mock-codex'){document.getElementById('design-dialog').close();toast('演示状态：Codex 已连接');}
   if(name==='phone-cert')toast('设计预览：正式手机页会下载电脑提供的公开证书');

@@ -125,6 +125,8 @@ function makeHarness(values = {}) {
     document,
     CustomEvent: FakeEvent,
     Event: FakeEvent,
+    setTimeout,
+    clearTimeout,
     requestAnimationFrame(callback) { callback(); },
     console
   };
@@ -161,6 +163,27 @@ test('captures a standalone right Alt using code and location', () => {
   input.focus(h.document);
   tapKey(h, 'AltRight', 2);
   assert.equal(input.value, 'ALT_RIGHT');
+});
+
+test('ambiguous Alt never changes the previous mapping', () => {
+  const h = makeHarness({ 'mapping-voice-start': 'ALT_RIGHT' });
+  const input = h.inputs.get('mapping-voice-start');
+  input.focus(h.document);
+  h.key('keydown', 'Alt');
+  assert.equal(input.value, 'ALT_RIGHT');
+});
+
+test('preset selection cancels partial input and records right Alt', () => {
+  const h = makeHarness({ 'mapping-voice-start': 'ALT_LEFT' });
+  const input = h.inputs.get('mapping-voice-start');
+  input.focus(h.document);
+  h.key('keydown', 'AltLeft', 1);
+  let changes = 0;
+  input.addEventListener('change', () => changes++);
+  h.window.ShunyanShortcutRecorder.setMapping(input, 'ALT_RIGHT');
+  h.key('keyup', 'AltLeft', 1);
+  assert.equal(input.value, 'ALT_RIGHT');
+  assert.equal(changes, 1);
 });
 
 test('collapses an AltGraph synthetic ControlLeft into standalone right Alt', () => {
@@ -259,16 +282,16 @@ test('blur and hidden document cancel incomplete capture without changing the ol
   assert.equal(hiddenInput.value, 'ESC');
 });
 
-test('unsupported keys use the shared feedback event and do not change the mapping', () => {
+test('unsupported keys request manual selection and do not change the mapping', () => {
   const h = makeHarness({ 'mapping-cancel': 'ESC' });
   const messages = [];
-  h.document.addEventListener('shunyan-shortcut-feedback', (event) => messages.push(event.detail));
+  h.document.addEventListener('shunyan-shortcut-manual', (event) => messages.push(event.detail));
   const input = h.inputs.get('mapping-cancel');
   input.focus(h.document);
   h.key('keydown', 'Unidentified');
   assert.equal(input.value, 'ESC');
   assert.equal(messages.length, 1);
-  assert.equal(messages[0].type, 'error');
+  assert.equal(messages[0].inputId, 'mapping-cancel');
 });
 
 test('rejects more than five unique keys without replacing the previous mapping', () => {

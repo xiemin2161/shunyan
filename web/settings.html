@@ -7,7 +7,7 @@
   <link rel="manifest" href="./manifest.webmanifest">
   <link rel="stylesheet" href="./styles.css"><link rel="stylesheet" href="./glyph-layer.css">
   <link rel="stylesheet" href="./codex-component.css"><link rel="stylesheet" href="./preview-customizer.css"><link rel="stylesheet" href="./paired-devices.css">
-  <link rel="stylesheet" href="./shortcut-recorder.css">
+  <link rel="stylesheet" href="./shortcut-recorder.css?v=20261117-visible-shortcuts2">
   <link rel="stylesheet" href="./setup-flow.css?v=2"><link rel="stylesheet" href="./service-control.css"><title>顺言设置</title>
 </head>
 <body class="settings-page">
@@ -102,12 +102,11 @@
               <label class="mode-card"><input type="radio" name="voice-mode" value="hold"><span><b>按住说话</b><small>按住录音，松开停止</small></span></label>
             </fieldset>
             <div class="mapping-grid">
-              <label class="field"><span>语音开始</span><input id="mapping-voice-start" autocomplete="off" spellcheck="false" value="ALT_RIGHT" placeholder="ALT_RIGHT 或 CTRL_LEFT+SHIFT_LEFT+S"><small>点击后按下快捷键，支持单键与组合键</small></label>
-              <label class="field"><span>语音停止</span><input id="mapping-voice-stop" autocomplete="off" spellcheck="false" value="ALT_RIGHT" placeholder="ALT_RIGHT"><small>可与语音开始使用相同快捷键</small></label>
+              <label class="field"><span>语音按键</span><input id="mapping-voice-start" autocomplete="off" spellcheck="false" value="ALT_RIGHT" placeholder="点击后按下语音快捷键"><small>点按模式用同一个按键开始和停止；按住模式按下开始、松开停止</small></label>
               <label class="field"><span>确认</span><input id="mapping-confirm" autocomplete="off" spellcheck="false" value="ENTER" placeholder="ENTER"></label>
               <label class="field"><span>取消</span><input id="mapping-cancel" autocomplete="off" spellcheck="false" value="ESC" placeholder="ESC"></label>
             </div>
-            <p class="key-help">点击快捷键输入框后直接按键录入。支持左右 Alt / Ctrl / Shift / Command 和组合键；系统或浏览器保留的快捷键可能无法捕获。手机需连接实体键盘才能录入。</p>
+            <p class="key-help">点击按键输入框后直接按实体键盘录入，录入结果会立即显示并提示成功。支持单独的左右 Alt / Ctrl / Shift / Command，也支持组合键；手机需连接实体键盘才能录入。</p>
           </section></section>
 <section id="audio-routing" class="function-group"><div class="function-heading"><h2>音频设备</h2><p>把手机麦克风转接给电脑上的语音软件。</p></div><section class="settings-panel function-panel"><div class="audio-device-reserved">
               <details class="audio-instructions"><summary>音频使用说明</summary><small>手机麦克风不会出现在上方列表。手机控制页获取麦克风权限后，将声音发送到这里选定的电脑播放端。要让闪电说接收声音，需要选择虚拟音频通道，并在闪电说中选择该通道对应的录音端。当前列出的 UU 虚拟音频设备是否支持这条路径，需实际测试确认；音箱与显示器播放设备不代表手机麦克风。音频仅实时转发，不保存录音。</small></details>
@@ -142,13 +141,14 @@
   <div class="toast-region" id="toast-region" role="status" aria-live="polite" aria-atomic="true"></div>
   <dialog id="scan-dialog" class="scan-dialog" aria-labelledby="scan-title"><div class="scan-dialog-header"><h2 id="scan-title">扫描电脑连接二维码</h2><button type="button" id="close-scanner" aria-label="关闭扫码">×</button></div><video id="scan-video" autoplay muted playsinline></video><p>将电脑显示的二维码放入画面，识别成功后自动连接。画面仅在本机处理。</p><div class="scan-dialog-footer"><button class="button secondary" id="cancel-scanner" type="button">取消扫码</button></div></dialog>
   <dialog id="remove-device-dialog" class="device-remove-dialog" aria-labelledby="remove-device-title"><h2 id="remove-device-title">移除配对设备</h2><p id="remove-device-description"></p><div class="device-remove-footer"><button class="button secondary" id="cancel-remove-device" type="button">取消</button><button class="button primary" id="confirm-remove-device" type="button">移除设备</button></div></dialog>
+  <dialog id="shortcut-manual-dialog" class="device-remove-dialog" aria-labelledby="shortcut-manual-title"><h2 id="shortcut-manual-title">选择按键</h2><p>未能识别按键。单独使用 Alt、Ctrl、Shift 或 Command 时，勾选对应按键即可；设置组合键时，勾选修饰键并选择普通按键。</p><div id="shortcut-manual-modifiers" class="shortcut-manual-modifiers" aria-label="组合键修饰键"></div><label class="field"><span>按键</span><select id="shortcut-manual-key"></select></label><div class="device-remove-footer"><button class="button secondary" id="shortcut-manual-cancel" type="button">取消</button><button class="button primary" id="shortcut-manual-confirm" type="button">确定</button></div></dialog>
   <script src="./vendor/qrcode.js" defer></script>
   <script src="./vendor/jsQR.js" defer></script>
   <script src="./connection-ui.js" defer></script>
   <script src="./codex-component.js" defer></script><script src="./physical-feedback.js" defer></script><script src="./preview-customizer.js" defer></script><script src="./paired-devices.js" defer></script>
   <script src="./settings-layout.js" defer></script>
-  <script src="./settings.js" defer></script>
-  <script src="./shortcut-recorder.js" defer></script>
+  <script src="./settings.js?v=20261117-visible-shortcuts2" defer></script>
+  <script src="./shortcut-recorder.js?v=20261117-visible-shortcuts2" defer></script>
   <script src="./audio-stream.js" defer></script><script src="./setup-flow.js?v=2" defer></script><script src="./service-control.js" defer></script>
   <script type="module" src="./keycaps-3d.js"></script>
 </body>

@@ -1,5 +1,3 @@
-import importlib.machinery
-import importlib.util
 import json
 from pathlib import Path
 import tempfile
@@ -80,17 +78,3 @@ class RestartApiTests(RestartTests):
         self.server.restart_callback=None
         self.assertEqual(self.request()[0],503)
         self.callback.assert_not_called()
-
-
-class ManualBootstrapTests(unittest.TestCase):
-    def test_manual_bootstrap_refuses_active_recording_without_killing(self):
-        loader=importlib.machinery.SourceFileLoader('manual_restart_component',str(Path('tools/restart_current_service.pyw').resolve()))
-        module=importlib.util.module_from_spec(importlib.util.spec_from_loader(loader.name,loader));loader.exec_module(module)
-        with tempfile.TemporaryDirectory() as folder:
-            cert=Path(folder)/'root.cer';cert.write_bytes(b'-----BEGIN CERTIFICATE-----\nplaceholder')
-            response=Mock();response.__enter__=Mock(return_value=response);response.__exit__=Mock(return_value=False)
-            response.read.return_value=b'{"data":{"voiceActive":true}}'
-            opener=Mock();opener.open.return_value=response
-            with patch.object(module,'find_service',return_value=(999,['pythonw','-m','host.server','--trust-cert',str(cert)])),patch.object(module.ssl,'create_default_context'),patch.object(module.urllib.request,'build_opener',return_value=opener),patch.object(module.os,'kill') as kill:
-                with self.assertRaises(RuntimeError):module.restart()
-                kill.assert_not_called()

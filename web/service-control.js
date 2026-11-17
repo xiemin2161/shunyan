@@ -9,9 +9,8 @@
  const toast=(message,type='')=>document.dispatchEvent(new CustomEvent('shunyan-shortcut-feedback',{detail:{message,type}}));
  const dialog=document.createElement('dialog');dialog.className='service-control-dialog';document.body.append(dialog);
  function bootstrap(){
-  dialog.innerHTML='<h2>首次启用重启功能</h2><p>当前运行的是旧后台，还不支持网页重启。下载本机启动器，在运行顺言的这台电脑上双击一次，即可加载新后台。</p><p>请先结束录音、松开所有按键。启动器会备份配置、保留配对及证书，并替换原8765实例；不会重启电脑或打开终端窗口。</p><p>完成后此页会自动刷新，以后直接点击“重启服务”即可。</p><footer><button class="button secondary" data-close>取消</button><button class="button primary" data-download>下载首次启动器</button></footer>';
+  dialog.innerHTML='<h2>请先更新后台</h2><p>当前后台版本不支持网页重启。请结束录音并关闭当前顺言服务，再使用本机原有的启动方式启动最新版。保持原来的证书和配置参数，启动后即可在这里重启服务。</p><footer><button class="button secondary" data-close>关闭</button></footer>';
   dialog.querySelector('[data-close]').onclick=()=>dialog.close();
-  dialog.querySelector('[data-download]').onclick=()=>{const a=document.createElement('a');a.href='./service-restart-bootstrap.vbs';a.download='顺言首次重启.vbs';document.body.append(a);a.click();a.remove();toast('启动器已请求下载，请在这台电脑上双击运行');};
   dialog.showModal();
  }
  async function health(){const r=await fetch('/api/v1/health',{cache:'no-store'});if(!r.ok)throw Error();return (await r.json()).data;}

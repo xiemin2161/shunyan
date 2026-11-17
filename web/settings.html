@@ -109,7 +109,7 @@
             <p class="key-help">点击按键输入框后直接按实体键盘录入，录入结果会立即显示并提示成功。支持单独的左右 Alt / Ctrl / Shift / Command，也支持组合键；手机需连接实体键盘才能录入。</p>
           </section></section>
 <section id="audio-routing" class="function-group"><div class="function-heading"><h2>音频设备</h2><p>把手机麦克风转接给电脑上的语音软件。</p></div><section class="settings-panel function-panel"><div class="audio-device-reserved">
-              <details class="audio-instructions"><summary>音频使用说明</summary><small>手机麦克风不会出现在上方列表。手机控制页获取麦克风权限后，将声音发送到这里选定的电脑播放端。要让闪电说接收声音，需要选择虚拟音频通道，并在闪电说中选择该通道对应的录音端。当前列出的 UU 虚拟音频设备是否支持这条路径，需实际测试确认；音箱与显示器播放设备不代表手机麦克风。音频仅实时转发，不保存录音。</small></details>
+              <details class="audio-instructions"><summary>音频使用说明</summary><small>手机控制页获取麦克风权限后，将声音发送到电脑所选的虚拟音频播放端。在语音输入软件中选择对应的虚拟录音端。音箱与显示器播放设备不代表手机麦克风。音频仅实时转发，不保存录音。</small></details>
               <div>
                 <p class="audio-route-note">手机麦克风由手机网页采集。这里选择电脑接收声音的通道。</p><label class="field"><span>电脑音频接收通道（播放端）</span><select id="audio-output-device" disabled><option value="">连接电脑后读取可用设备</option></select></label>
                 <div class="settings-actions">
@@ -149,7 +149,7 @@
   <script src="./settings-layout.js" defer></script>
   <script src="./settings.js?v=20261117-visible-shortcuts2" defer></script>
   <script src="./shortcut-recorder.js?v=20261117-visible-shortcuts2" defer></script>
-  <script src="./audio-stream.js" defer></script><script src="./setup-flow.js?v=2" defer></script><script src="./service-control.js" defer></script>
+  <script src="./audio-stream.js" defer></script><script src="./setup-flow.js?v=3" defer></script><script src="./service-control.js?v=2" defer></script>
   <script type="module" src="./keycaps-3d.js"></script>
 </body>
 </html>

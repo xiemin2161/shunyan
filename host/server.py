@@ -1169,9 +1169,20 @@ def _private_bind_address(host: str) -> str:
     return host
 
 
+def _detect_lan_address() -> str:
+    """Use the OS route to select a local private IPv4 address; no data is sent."""
+    with socket.socket(socket.AF_INET, socket.SOCK_DGRAM) as probe:
+        probe.connect(('192.0.2.1', 9))
+        address = probe.getsockname()[0]
+    address = _private_bind_address(address)
+    if ipaddress.ip_address(address).is_loopback or ipaddress.ip_address(address).is_link_local:
+        raise ValueError('无法自动确定局域网地址，请用 --host 指定电脑的私网 IP')
+    return address
+
+
 def main() -> int:
     parser = argparse.ArgumentParser(description="顺言本机语音控制服务")
-    parser.add_argument("--host", default="127.0.0.1", help="监听本机或私有网络 IP，默认仅本机")
+    parser.add_argument("--host", default="127.0.0.1", help="监听本机或私有网络 IP；auto 自动选择局域网地址，默认仅本机")
     parser.add_argument("--port", type=int, default=8765, help="监听端口，默认 8765")
     parser.add_argument("--config-dir", help="独立实例的私有配置目录；省略时沿用当前用户配置")
     parser.add_argument("--tls-cert", help="TLS 证书 PEM 路径；使用手机麦克风时需可信 HTTPS")
@@ -1180,8 +1191,8 @@ def main() -> int:
     parser.add_argument("--cert-port", type=int, help="可选：仅提供公开证书安装页的局域网 HTTP 端口")
     args = parser.parse_args()
     try:
-        bind_host = _private_bind_address(args.host)
-    except ValueError as exc:
+        bind_host = _detect_lan_address() if args.host == 'auto' else _private_bind_address(args.host)
+    except (ValueError, OSError) as exc:
         parser.error(str(exc))
     if not (1 <= args.port <= 65535):
         parser.error("--port 必须在 1 到 65535 之间")

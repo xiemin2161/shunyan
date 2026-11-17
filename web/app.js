@@ -199,7 +199,7 @@
     const audioStop = stopPhoneAudio(keepalive);
     held = false; voiceActive = false;
     holdKeyDown = false;
-    $('voice-key')?.classList.remove('is-active');
+    $('voice-key')?.classList.remove('is-active', 'visual-pressed');
     $('voice-key')?.setAttribute('aria-pressed', 'false');
     await Promise.all([releaseRequest, audioStop]);
   }
@@ -222,6 +222,7 @@
       if (typeof data.voiceActive === 'boolean') {
         voiceActive = data.voiceActive;
         $('voice-key').classList.toggle('is-active', voiceActive || held);
+        $('voice-key').classList.toggle('visual-pressed', voiceActive || held);
         $('voice-key').setAttribute('aria-pressed', String(voiceActive || held));
         if (config.voiceMode === 'toggle' && !voiceActive && window.PhoneAudioStream?.active && !voiceBusy) {
           stopPhoneAudio(true);
@@ -232,7 +233,7 @@
       if (navigator.onLine) await releaseAll(true);
       else {
         clearInterval(leaseTimer); leaseTimer = 0; held = false; voiceActive = false;
-        $('voice-key').classList.remove('is-active'); $('voice-key').setAttribute('aria-pressed', 'false');
+        $('voice-key').classList.remove('is-active', 'visual-pressed'); $('voice-key').setAttribute('aria-pressed', 'false');
       }
     } finally {
       statusBusy = false;
@@ -272,7 +273,7 @@
       voiceActive = result.voiceActive;
       if (!voiceActive) { await stream.stop(); return; }
       stream.resume();
-      $('voice-key').classList.add('is-active');
+      $('voice-key').classList.add('is-active', 'visual-pressed');
       $('voice-key').setAttribute('aria-pressed', 'true');
       toast('手机麦克风已接入语音输入', 'success');
     } catch (error) {
@@ -291,12 +292,12 @@
       voiceActive = result.voiceActive;
       if (operation !== voiceOperation) { await releaseAll(true); return; }
       if (voiceActive) {
-        $('voice-key').classList.add('is-active');
+        $('voice-key').classList.add('is-active', 'visual-pressed');
         $('voice-key').setAttribute('aria-pressed', 'true');
         toast('主机仍处于语音输入状态，请再按一次停止', 'error');
         return;
       }
-      $('voice-key').classList.remove('is-active');
+      $('voice-key').classList.remove('is-active', 'visual-pressed');
       $('voice-key').setAttribute('aria-pressed', 'false');
       await stopPhoneAudio();
       toast('语音输入已停止', 'success');
@@ -324,7 +325,7 @@
     voiceBusy = true;
     const operation = ++voiceOperation;
     try { event.currentTarget.setPointerCapture(event.pointerId); } catch { /* 某些 WebView 不支持捕获 */ }
-    $('voice-key').classList.add('is-active'); $('voice-key').setAttribute('aria-pressed', 'true');
+    $('voice-key').classList.add('is-active', 'visual-pressed'); $('voice-key').setAttribute('aria-pressed', 'true');
     holdStartPromise = (async () => {
       try {
         const stream = await ensurePhoneAudioStream();
@@ -367,7 +368,7 @@
       if (!released) { await releaseAll(true); return; }
     }
     await stopPhoneAudio();
-    $('voice-key').classList.remove('is-active'); $('voice-key').setAttribute('aria-pressed', 'false');
+    $('voice-key').classList.remove('is-active', 'visual-pressed'); $('voice-key').setAttribute('aria-pressed', 'false');
   }
 
   async function stopVoiceBeforeAction() {

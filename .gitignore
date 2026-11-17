@@ -28,3 +28,14 @@ __pycache__/
 *.py[cod]
 .venv/
 venv/
+.pytest_cache/
+.ruff_cache/
+.coverage
+.coverage.*
+htmlcov/
+*.egg-info/
+
+# Runtime pairing and Codex credentials are local-only.
+paired-devices.json
+codex-connection.json
+.shunyan/

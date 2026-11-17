@@ -1,0 +1,53 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <meta name="theme-color" content="#e8edef">
+  <meta name="description" content="通过手机控制已配对电脑的三键快捷键面板。">
+  <link rel="manifest" href="./manifest.webmanifest">
+  <link rel="stylesheet" href="./styles.css"><link rel="stylesheet" href="./glyph-layer.css">
+  <title>三键控制面板</title>
+</head>
+<body class="controller-page"><nav class="visual-preview-controls"><label>按键主题 <select id="preview-theme" aria-label="视觉验收按键主题"><option value="glass">通透玻璃</option><option value="recessed">白色圆凹</option><option value="matte-black">哑光黑键</option></select></label><button data-preview="idle">未按压</button><button data-preview="voice">语音按下</button><button data-preview="confirm">确认按下</button><button data-preview="cancel">取消按下</button><button data-inspection-zoom aria-pressed="false">放大检查</button></nav><p class="visual-preview-note">仅视觉验收，不连接主机、不发送按键、不采集音频。</p>
+  <a class="settings-entry" href="./settings.html" aria-label="打开设置" title="设置">
+    <svg viewBox="0 0 24 24" preserveAspectRatio="xMidYMid meet" aria-hidden="true">
+      <path d="M8.88 4.47 9.62 4.21 10.08 2.95 10.44 2.12 13.56 2.12 13.92 2.95 14.38 4.21 15.12 4.47 15.83 4.8 17.04 4.24 17.88 3.91 20.09 6.12 19.76 6.96 19.2 8.17 19.53 8.88 19.79 9.62 21.05 10.08 21.88 10.44 21.88 13.56 21.05 13.92 19.79 14.38 19.53 15.12 19.2 15.83 19.76 17.04 20.09 17.88 17.88 20.09 17.04 19.76 15.83 19.2 15.12 19.53 14.38 19.79 13.92 21.05 13.56 21.88 10.44 21.88 10.08 21.05 9.62 19.79 8.88 19.53 8.17 19.2 6.96 19.76 6.12 20.09 3.91 17.88 4.24 17.04 4.8 15.83 4.47 15.12 4.21 14.38 2.95 13.92 2.12 13.56 2.12 10.44 2.95 10.08 4.21 9.62 4.47 8.88 4.8 8.17 4.24 6.96 3.91 6.12 6.12 3.91 6.96 4.24 8.17 4.8Z"/>
+      <circle cx="12" cy="12" r="3.2"/>
+    </svg>
+  </a>
+
+  <main class="controller-stage device-stage" data-device-stage="controller" aria-label="三键语音控制面板">
+    <section class="device-shell style-soft" data-device-shell data-form-factor="desktop">
+      <span class="screw screw-top-left" aria-hidden="true"><img src="./assets/screw-cross.svg" alt=""></span>
+      <span class="screw screw-top-right" aria-hidden="true"><img src="./assets/screw-cross.svg" alt=""></span>
+      <span class="screw screw-bottom-left" aria-hidden="true"><img src="./assets/screw-cross.svg" alt=""></span>
+      <span class="screw screw-bottom-right" aria-hidden="true"><img src="./assets/screw-cross.svg" alt=""></span>
+
+      <div class="device-screen" aria-live="polite" aria-atomic="true">
+        <div class="screen-kicker"><span class="screen-led" id="screen-led"></span><span><span class="screen-latin">CODEX</span> · 本地状态</span></div>
+        <strong class="screen-title" id="screen-title">状态未知</strong>
+        <p class="screen-detail" id="screen-detail">等待已配对主机反馈</p>
+      </div>
+
+      <div class="key-row" role="group" aria-label="控制按键">
+        <button class="key voice-key" id="voice-key" type="button" aria-label="语音输入" aria-pressed="false">
+          <span class="key-face"><span class="key-icon" id="voice-icon" aria-hidden="true"></span></span>
+        </button>
+        <button class="key confirm-key" id="confirm-key" type="button" aria-label="确认">
+          <span class="key-face"><span class="key-icon" id="confirm-icon" aria-hidden="true"></span></span>
+        </button>
+        <button class="key cancel-key" id="cancel-key" type="button" aria-label="取消">
+          <span class="key-face"><span class="key-icon" id="cancel-icon" aria-hidden="true"></span></span>
+        </button>
+      </div>
+    </section>
+  </main>
+
+  <div class="toast-region" id="toast-region" role="status" aria-live="polite" aria-atomic="true"></div>
+  <script src="./device-layout.js" defer></script>
+  <script src="./physical-feedback.js" defer></script>
+  <script src="./press-preview.js" defer></script>
+  <script type="module" src="./keycaps-3d.js"></script>
+</body>
+</html>

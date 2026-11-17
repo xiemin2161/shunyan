@@ -23,18 +23,24 @@ DEFAULT_CONFIG: dict[str, Any] = {
         "cancel": ["ESC"],
     },
     "appearance": {
+        "keyTheme": "glass",
         "keyStyle": "soft",
         "keyRadius": 22,
         "keys": {
-            "voice": {"icon": "mic", "color": "#d9e7ed", "glow": "#a9d9f5"},
-            "confirm": {"icon": "check", "color": "#d9e7ed", "glow": "#a9e6ce"},
-            "cancel": {"icon": "x", "color": "#d9e7ed", "glow": "#f1afbb"},
+            "voice": {"icon": "mic", "color": "#d9eee7", "glow": "#8ce9be"},
+            "confirm": {"icon": "check", "color": "#e0ebf5", "glow": "#83c9ff"},
+            "cancel": {"icon": "x", "color": "#f3e4e3", "glow": "#f5a39a"},
         },
     },
     "audio": {"outputDeviceId": None},
 }
 
-_ICONS = frozenset({"mic", "check", "x", "sparkles", "send", "play", "pause", "keyboard", "custom"})
+LEGACY_APPEARANCE = {"keyStyle":"soft", "keyRadius":22, "keys":{
+    "voice":{"icon":"mic","color":"#d9e7ed","glow":"#a9d9f5"},
+    "confirm":{"icon":"check","color":"#d9e7ed","glow":"#a9e6ce"},
+    "cancel":{"icon":"x","color":"#d9e7ed","glow":"#f1afbb"}}}
+
+_ICONS = frozenset({"mic", "wave", "record", "check", "enter", "check-circle", "x", "back", "stop", "sparkles", "send", "play", "pause", "keyboard", "custom"})
 _COLOR = re.compile(r"^#[0-9a-fA-F]{6}$")
 _CONFIG_KEYS = frozenset({"voiceMode", "mappings", "appearance", "audio"})
 _MAX_ICON_BYTES = 256 * 1024
@@ -118,8 +124,11 @@ def _validate_config(value: object) -> dict[str, Any]:
     }
 
     appearance = _require_object(source.get("appearance"), "appearance")
-    if set(appearance) != {"keyStyle", "keyRadius", "keys"}:
+    if not {"keyStyle", "keyRadius", "keys"} <= set(appearance) or set(appearance)-{"keyTheme", "keyStyle", "keyRadius", "keys"}:
         raise ValueError("appearance 字段不完整或包含未支持的字段")
+    key_theme=appearance.get("keyTheme", "glass")
+    if key_theme not in {"glass", "recessed", "matte-black"}:
+        raise ValueError("按键主题不受支持")
     key_style = appearance.get("keyStyle")
     if not isinstance(key_style, str) or key_style not in {"soft", "glass", "solid"}:
         raise ValueError("keyStyle 不受支持")
@@ -165,6 +174,7 @@ def _validate_config(value: object) -> dict[str, Any]:
         "voiceMode": mode,
         "mappings": safe_mappings,
         "appearance": {
+            "keyTheme": key_theme,
             "keyStyle": key_style,
             "keyRadius": int(radius),
             "keys": safe_keys,
@@ -181,7 +191,12 @@ class ConfigStore:
     def _load(self) -> dict[str, Any]:
         try:
             with self.path.open("r", encoding="utf-8") as handle:
-                return _validate_config(json.load(handle))
+                value=_validate_config(json.load(handle))
+            # Only the exact former default palette upgrades. Any user color,
+            # shape or uploaded icon keeps its explicit custom rendering.
+            if value["appearance"].get("keyTheme")=="glass" and {k:v for k,v in value["appearance"].items() if k!="keyTheme"}==LEGACY_APPEARANCE:
+                value["appearance"]=json.loads(json.dumps(DEFAULT_CONFIG["appearance"]))
+            return value
         except FileNotFoundError:
             return _validate_config(DEFAULT_CONFIG)
         except (OSError, json.JSONDecodeError, ValueError):

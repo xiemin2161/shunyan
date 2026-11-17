@@ -9,12 +9,12 @@
   function fitController() {
     const mobile = window.matchMedia('(max-width: 760px)').matches;
     const formFactor = mobile ? 'mobile' : 'desktop';
-    const baseWidth = mobile ? 320 : 620;
-    const baseHeight = mobile ? 320 : 465;
+    const baseWidth = 386;
+    const baseHeight = 321;
     const rootStyle = getComputedStyle(document.documentElement);
     const safeTop = parseFloat(rootStyle.getPropertyValue('--safe-top')) || 0;
     const safeBottom = parseFloat(rootStyle.getPropertyValue('--safe-bottom')) || 0;
-    const marginX = mobile ? 32 : 48;
+    const marginX = mobile ? 30 : 48;
     const marginY = mobile ? 32 : 48;
     const viewportWidth = window.visualViewport?.width || document.documentElement.clientWidth;
     const viewportHeight = window.visualViewport?.height || document.documentElement.clientHeight;
@@ -35,6 +35,7 @@
     shell.style.transform = `translate(-50%, -50%) scale(${Math.max(.1, scale)})`;
     controllerStage.style.width = `${baseWidth * scale}px`;
     controllerStage.style.height = `${baseHeight * scale}px`;
+    controllerStage.style.transform = `translate(${-2.5 * scale}px, ${-9 * scale}px)`;
   }
   function scheduleFit() {
     cancelAnimationFrame(frame);

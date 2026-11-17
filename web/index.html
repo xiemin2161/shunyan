@@ -6,7 +6,7 @@
   <meta name="theme-color" content="#e8edef">
   <meta name="description" content="通过手机控制已配对电脑的三键快捷键面板。">
   <link rel="manifest" href="./manifest.webmanifest">
-  <link rel="stylesheet" href="./styles.css">
+  <link rel="stylesheet" href="./styles.css"><link rel="stylesheet" href="./glyph-layer.css">
   <title>三键控制面板</title>
 </head>
 <body class="controller-page">
@@ -25,7 +25,7 @@
       <span class="screw screw-bottom-right" aria-hidden="true"><img src="./assets/screw-cross.svg" alt=""></span>
 
       <div class="device-screen" aria-live="polite" aria-atomic="true">
-        <div class="screen-kicker"><span class="screen-led" id="screen-led"></span><span>CODEX · 本地状态</span></div>
+        <div class="screen-kicker"><span class="screen-led" id="screen-led"></span><span><span class="screen-latin">CODEX</span> · 本地状态</span></div>
         <strong class="screen-title" id="screen-title">状态未知</strong>
         <p class="screen-detail" id="screen-detail">等待已配对主机反馈</p>
       </div>
@@ -46,6 +46,8 @@
 
   <div class="toast-region" id="toast-region" role="status" aria-live="polite" aria-atomic="true"></div>
   <script src="./device-layout.js" defer></script>
+  <script src="./physical-feedback.js" defer></script>
   <script src="./app.js" defer></script>
+  <script type="module" src="./keycaps-3d.js"></script>
 </body>
 </html>

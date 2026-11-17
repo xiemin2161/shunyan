@@ -1,0 +1,23 @@
+/* Icon changes replace only the small, clean center plane. Approved source
+   silhouette, material shoulders, contact shadow and illumination stay intact. */
+.reference-hardware .voice-key {--glyph-skin-x:-72.925px;--glyph-skin-y:-194.944px;}
+.reference-hardware .confirm-key {--glyph-skin-x:-181.598px;--glyph-skin-y:-194.944px;}
+.reference-hardware .cancel-key {--glyph-skin-x:-290.271px;--glyph-skin-y:-194.944px;}
+.reference-hardware .key.is-reference-key.has-custom-glyph .key-face::after {content:'';display:block;position:absolute;left:18px;top:16px;width:66px;height:70px;z-index:1;background:url('./assets/approved-glyph-clean.png') calc(var(--glyph-skin-x) - 18px) calc(var(--glyph-skin-y) - 16px) / 926.579px 385.598px no-repeat;mask:url('./assets/glyph-patch-mask.svg') 0 0 / 100% 100%;-webkit-mask:url('./assets/glyph-patch-mask.svg') 0 0 / 100% 100%;pointer-events:none;}
+.reference-hardware .key.is-reference-key.has-custom-glyph .key-icon {visibility:visible !important;display:grid;position:absolute;left:27px !important;top:25px !important;width:48px !important;height:48px !important;color:#151b18;z-index:2;}
+.reference-hardware .voice-key.is-reference-key.has-custom-glyph.is-physically-pressed .key-face::after,
+.reference-hardware .voice-key.is-reference-key.has-custom-glyph.visual-pressed .key-face::after {top:28.869px;background-position:-551.832px -226.673px;}
+.reference-hardware .key.is-reference-key.has-custom-glyph.is-physically-pressed .key-icon,
+.reference-hardware .key.is-reference-key.has-custom-glyph.visual-pressed .key-icon {top:37.869px !important;}
+.reference-hardware .confirm-key.is-reference-key.has-custom-glyph.is-physically-pressed .key-face::after,
+.reference-hardware .confirm-key.is-reference-key.has-custom-glyph.visual-pressed .key-face::after,
+.reference-hardware .cancel-key.is-reference-key.has-custom-glyph.is-physically-pressed .key-face::after,
+.reference-hardware .cancel-key.is-reference-key.has-custom-glyph.visual-pressed .key-face::after {display:none;}
+/* The whole face now travels continuously; glyphs stay fixed on that face. */
+.reference-hardware .key.is-reference-key.has-custom-glyph .key-icon {opacity:1;transition:none;}
+.reference-hardware .key.is-reference-key.has-custom-glyph.is-physically-pressed .key-icon,
+.reference-hardware .key.is-reference-key.has-custom-glyph.visual-pressed .key-icon {top:25px !important;}
+.reference-hardware .key.is-reference-key.has-custom-glyph .key-face::after {transition:opacity .075s ease-out;opacity:1;}
+.reference-hardware .key.is-reference-key.has-custom-glyph.is-physically-pressed .key-face::after,
+.reference-hardware .key.is-reference-key.has-custom-glyph.visual-pressed .key-face::after {display:block;top:16px;opacity:0;}
+.reference-hardware .voice-key.is-reference-key.has-custom-glyph .key-face::before {background-image:url('./assets/approved-glyph-clean.png');background-size:926.579px 385.598px;}

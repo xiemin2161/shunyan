@@ -5,7 +5,7 @@
     voiceMode: 'toggle',
     mappings: { voiceStart: ['ALT_RIGHT'], voiceStop: ['ALT_RIGHT'], confirm: ['ENTER'], cancel: ['ESC'] },
     appearance: {
-      keyStyle: 'soft', keyRadius: 22,
+      keyTheme: 'glass', keyStyle: 'soft', keyRadius: 22,
       keys: {
         voice: { icon: 'mic', iconData: null, color: '#d9eee7', glow: '#8ce9be' },
         confirm: { icon: 'check', iconData: null, color: '#e0ebf5', glow: '#83c9ff' },
@@ -18,7 +18,7 @@
     mic: '<svg viewBox="0 0 24 24"><rect x="9" y="3" width="6" height="12" rx="3"/><path d="M5.5 11.5a6.5 6.5 0 0 0 13 0M12 18v3m-4 0h8"/></svg>',
     wave: '<svg viewBox="0 0 24 24"><path d="M3 10v4m4-8v12m4-15v18m4-14v10m4-13v16m3-11v6"/></svg>',
     record: '<svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="8.5"/><circle cx="12" cy="12" r="3.3" fill="currentColor" stroke="none"/></svg>',
-    check: '<svg viewBox="0 0 24 24"><path d="m4 12.5 5.2 5.2L20 6.8"/></svg>',
+    check: '<svg viewBox="0 0 24 24" preserveAspectRatio="none"><path d="m4 12.5 5.2 5.2L20 6.8"/></svg>',
     enter: '<svg viewBox="0 0 24 24"><path d="M5 5v7h14M13 7l6 5-6 5"/></svg>',
     'check-circle': '<svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="m7.5 12.5 3 3 6-7"/></svg>',
     x: '<svg viewBox="0 0 24 24"><path d="m5 5 14 14M19 5 5 19"/></svg>',
@@ -28,11 +28,13 @@
   const $ = (id) => document.getElementById(id);
   const storageKey = `shunyan_session_${encodeURIComponent(location.origin)}`;
   let token = localStorage.getItem(storageKey);
+  let localViewer = false;
   let voiceActive = false;
   let held = false;
   let leaseTimer = 0;
   let statusTimer = 0;
   let statusBusy = false;
+  let configRevision = null;
   let config = JSON.parse(JSON.stringify(DEFAULTS));
   let toastTimer = 0;
   let lastActionErrorAt = 0;
@@ -96,6 +98,10 @@
     const shell = document.querySelector('.device-shell');
     if (!shell) return;
     const look = config.appearance || DEFAULTS.appearance;
+    shell.classList.add('reference-hardware');
+    shell.classList.toggle('theme-recessed',look.keyTheme==='recessed');
+    shell.classList.toggle('theme-matte-black',look.keyTheme==='matte-black');
+    shell.dataset.keyTheme=look.keyTheme||'glass';
     const keyStyle = ['soft', 'glass', 'solid'].includes(look.keyStyle) ? look.keyStyle : 'soft';
     shell.classList.remove('style-soft', 'style-glass', 'style-solid'); shell.classList.add(`style-${keyStyle}`);
     shell.style.setProperty('--key-radius', `${Math.max(12, Math.min(34, Number(look.keyRadius) || 22))}px`);
@@ -104,6 +110,11 @@
       shell.style.setProperty(`--${key}-color`, /^#[0-9a-f]{6}$/i.test(value.color) ? value.color : DEFAULTS.appearance.keys[key].color);
       shell.style.setProperty(`--${key}-glow`, /^#[0-9a-f]{6}$/i.test(value.glow) ? value.glow : DEFAULTS.appearance.keys[key].glow);
       renderIcon(`${key}-icon`, value.icon, value.iconData);
+      const original=DEFAULTS.appearance.keys[key];
+      const reference=(!look.keyTheme||look.keyTheme==='glass') && keyStyle==='soft' && (Number(look.keyRadius)||22)===22 && String(value.color).toLowerCase()===original.color && String(value.glow).toLowerCase()===original.glow;
+      document.querySelector('.'+key+'-key').classList.toggle('is-reference-key',reference);
+      document.querySelector('.'+key+'-key').classList.toggle('has-custom-glyph',value.icon!==original.icon||Boolean(safeImageData(value.iconData)));
+
     }
   }
 
@@ -179,6 +190,7 @@
   }
 
   async function releaseAll(keepalive = false) {
+    clearPhysical();
     clearInterval(leaseTimer); leaseTimer = 0;
     voiceOperation += 1;
     const releaseRequest = token
@@ -193,7 +205,7 @@
   }
 
   async function refreshStatus() {
-    if (!token || document.hidden || !navigator.onLine) {
+    if ((!token && !localViewer) || document.hidden || !navigator.onLine) {
       renderStatus(null, false);
       if ((!navigator.onLine || !token) && (held || voiceActive || window.PhoneAudioStream?.active)) releaseAll(true);
       return;
@@ -201,8 +213,11 @@
     if (statusBusy) return;
     statusBusy = true;
     try {
-      const data = await request('/status');
+      const data = await request(localViewer?'/local-status':'/status',{},!localViewer);
       const status = data.codex || data.status || data;
+      if(typeof data.configRevision==='number'){
+        if(configRevision!==data.configRevision && !held && !voiceBusy && !voiceActive){if(await loadSettings())configRevision=data.configRevision;}
+      }
       renderStatus(status, true);
       if (typeof data.voiceActive === 'boolean') {
         voiceActive = data.voiceActive;
@@ -225,12 +240,13 @@
   }
 
   async function loadSettings() {
-    if (!token) return;
+    if (!token && !localViewer) return false;
     try {
-      const data = await request('/config');
+      const data = await request(localViewer?'/local-config':'/config',{},!localViewer);
       config = JSON.parse(JSON.stringify(data.config || data || DEFAULTS));
       applyAppearance();
-    } catch { /* 未连接时使用安全默认外观 */ }
+      return true;
+    } catch { return false; /* 暂用安全外观，下次状态轮询重试 */ }
   }
 
   async function startToggleVoice() {
@@ -288,6 +304,7 @@
   }
 
   async function clickVoice() {
+    if(localViewer && !token){toast('电脑预览模式，请使用已配对手机触发按键');return;}
     if (config.voiceMode === 'hold') return;
     if (voiceBusy) {
       // A second tap while permission or host startup is pending cancels that start.
@@ -301,6 +318,7 @@
   }
 
   async function startHold(event) {
+    if(localViewer && !token)return;
     if (config.voiceMode !== 'hold' || event.button !== 0 || held || voiceBusy) return;
     event.preventDefault(); held = true;
     voiceBusy = true;
@@ -359,6 +377,10 @@
     await cleanup;
   }
 
+
+  // Only visual feedback is shared; mapped keyboard/audio control stays below.
+  const physicalFeedback=window.PhysicalKeyFeedback.attach(['voice','confirm','cancel'].map(name=>$(name+'-key')));
+  function clearPhysical(){physicalFeedback.clear('release-all');}
   $('voice-key').addEventListener('pointerdown', startHold);
   $('voice-key').addEventListener('pointerup', endHold);
   $('voice-key').addEventListener('pointercancel', endHold);
@@ -389,7 +411,8 @@
   });
 
   (async () => {
-    if (!token) { renderStatus(null, false); return; }
+    try{const info=await request('/connection-info',{},false);localViewer=info.isLocalHost===true;}catch{ /* 配对手机仍可使用认证接口 */ }
+    if (!token && !localViewer) { renderStatus(null, false); return; }
     statusTimer = setInterval(refreshStatus, 2000);
     try { await request('/health', {}, false); await loadSettings(); await refreshStatus(); }
     catch { renderStatus(null, false); }

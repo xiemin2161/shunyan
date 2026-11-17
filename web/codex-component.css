@@ -1,0 +1,11 @@
+.codex-component {margin-top:20px;}
+.codex-component-heading {display:flex;align-items:center;justify-content:space-between;gap:14px;}
+.codex-component-heading h2 {font-size:17px;margin:3px 0 0;}
+.codex-component>p {min-height:36px;font-size:12px;line-height:1.8;color:var(--muted);}
+.codex-component-fields {display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);gap:20px;align-items:center;}
+.codex-component-project {display:grid;gap:7px;color:var(--muted);font-size:12px;}
+.codex-component-project b {color:var(--ink);}
+.codex-component-project small {font-size:11px;line-height:1.7;}
+.codex-component-actions {display:flex;gap:10px;flex-wrap:wrap;margin-top:20px;}
+#install-codex-component {min-width:164px;}
+@media(max-width:760px) {.codex-component-fields {grid-template-columns:1fr;gap:14px;}}

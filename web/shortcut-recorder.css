@@ -1,0 +1,30 @@
+.shortcut-recorder-field { position: relative; }
+.shortcut-recorder-input {
+  color: transparent !important;
+  -webkit-text-fill-color: transparent;
+  caret-color: transparent;
+  user-select: none;
+}
+.shortcut-recorder-display {
+  position: absolute;
+  z-index: 1;
+  display: flex;
+  align-items: center;
+  overflow: hidden;
+  padding: 0 42px 0 12px;
+  border: 1px solid transparent;
+  color: #2f3c42;
+  font-size: 12px;
+  font-weight: 500;
+  line-height: 1.2;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+  pointer-events: none;
+}
+.shortcut-recorder-field:focus-within .shortcut-recorder-display {
+  color: #264e5c;
+}
+.shortcut-recorder-display[data-recording="true"] {
+  color: #397965;
+  font-weight: 600;
+}

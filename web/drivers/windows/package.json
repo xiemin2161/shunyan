@@ -1,0 +1,13 @@
+{
+  "name": "VB-CABLE",
+  "version": "Pack46",
+  "file": "VBCABLE_Driver_Pack46.zip",
+  "bytes": 1324680,
+  "sha256": "bc44e8974191a5a2427d6c979e2dab08dbb09925f3f435dfa2f0ba3e45b6eb90",
+  "source": "https://download.vb-audio.com/Download_CABLE/VBCABLE_Driver_Pack46.zip",
+  "publisher": "BUREL VINCENT Entrepreneur individuel",
+  "signerThumbprint": "A77952D93229D0EC36E2543081EEA7D125732B9C",
+  "licenseFile": "VB-CABLE-original-readme.txt",
+  "runtimeDownload": "same-origin-only",
+  "distribution": "Original archive, unmodified; independent vendor installer run by user"
+}

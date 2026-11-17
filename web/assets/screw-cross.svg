@@ -1,43 +1,13 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 72 72" fill="none">
-  <defs>
-    <radialGradient id="head" cx="28%" cy="22%" r="82%">
-      <stop offset="0" stop-color="#fff"/>
-      <stop offset=".18" stop-color="#edf1f2"/>
-      <stop offset=".43" stop-color="#aab3b8"/>
-      <stop offset=".64" stop-color="#f7f9f9"/>
-      <stop offset=".82" stop-color="#7d878d"/>
-      <stop offset="1" stop-color="#dbe0e2"/>
-    </radialGradient>
-    <radialGradient id="rim" cx="28%" cy="22%" r="85%">
-      <stop offset="0" stop-color="#fff"/>
-      <stop offset=".36" stop-color="#c9d0d3"/>
-      <stop offset=".68" stop-color="#f1f3f4"/>
-      <stop offset="1" stop-color="#9aa4a9"/>
-    </radialGradient>
-    <radialGradient id="well" cx="35%" cy="25%" r="85%">
-      <stop offset="0" stop-color="#737e84"/>
-      <stop offset=".48" stop-color="#d8dcde"/>
-      <stop offset=".72" stop-color="#a1aaae"/>
-      <stop offset="1" stop-color="#68737a"/>
-    </radialGradient>
-    <radialGradient id="cavity" cx="27%" cy="22%" r="85%">
-      <stop offset="0" stop-color="#293238"/>
-      <stop offset=".65" stop-color="#566168"/>
-      <stop offset="1" stop-color="#879196"/>
-    </radialGradient>
-    <linearGradient id="groove" x1="20%" y1="10%" x2="85%" y2="90%">
-      <stop stop-color="#161d21"/>
-      <stop offset=".48" stop-color="#313b40"/>
-      <stop offset="1" stop-color="#11171a"/>
-    </linearGradient>
-  </defs>
-  <circle cx="36" cy="38" r="32" fill="#30393e" opacity=".22"/>
-  <circle cx="36" cy="36" r="30.3" fill="url(#head)" stroke="#657178" stroke-width="1.2"/>
-  <circle cx="36" cy="36" r="26.3" fill="none" stroke="#fff" stroke-opacity=".9" stroke-width="1.35"/>
-  <circle cx="36" cy="36" r="22" fill="url(#rim)" stroke="#737e84" stroke-opacity=".58" stroke-width="1"/>
-  <circle cx="36" cy="36" r="16.2" fill="url(#well)" stroke="#f9fbfb" stroke-opacity=".76" stroke-width="1.15"/>
-  <circle cx="36" cy="36" r="11.3" fill="url(#cavity)" stroke="#667279" stroke-width=".9"/>
-  <path d="M32 20.5h8V32h11.5v8H40v11.5h-8V40H20.5v-8H32V20.5Z" fill="url(#groove)" stroke="#131a1e" stroke-width="1" stroke-linejoin="round"/>
-  <path d="M32.7 22.4v9.2h-9.2m17.8 8.8v8.8" stroke="#dce1e3" stroke-opacity=".62" stroke-width="1.1" stroke-linecap="round" stroke-linejoin="round"/>
-  <path d="M11.5 27.8a26.3 26.3 0 0 1 15-14.9" stroke="#fff" stroke-opacity=".72" stroke-width="1.6" stroke-linecap="round"/>
+<defs>
+<radialGradient id="rim" cx="28%" cy="18%" r="83%"><stop stop-color="#ffffff"/><stop offset=".35" stop-color="#dfe3e4"/><stop offset=".56" stop-color="#899093"/><stop offset=".72" stop-color="#f2f5f5"/><stop offset="1" stop-color="#70787d"/></radialGradient>
+<radialGradient id="face" cx="31%" cy="21%" r="88%"><stop stop-color="#ffffff"/><stop offset=".42" stop-color="#c8cdcf"/><stop offset=".72" stop-color="#a0a6a8"/><stop offset="1" stop-color="#7e8386"/></radialGradient>
+<linearGradient id="slot" x1="20%" y1="10%" x2="90%" y2="100%"><stop stop-color="#343a3d"/><stop offset=".65" stop-color="#535b5f"/><stop offset="1" stop-color="#747d82"/></linearGradient>
+</defs>
+<ellipse cx="36" cy="39" rx="31" ry="30" fill="#333a3e" opacity=".22"/>
+<circle cx="36" cy="36" r="29.6" fill="url(#rim)" stroke="#ffffff" stroke-opacity=".65" stroke-width="1.5"/>
+<circle cx="36" cy="36" r="23" fill="url(#face)" stroke="#676f74" stroke-opacity=".45" stroke-width="1.2"/>
+<path d="M33 21h6v12h12v6H39v12h-6V39H21v-6h12Z" fill="url(#slot)" stroke="#646c71" stroke-width=".8" stroke-linejoin="round" transform="rotate(12 36 36)"/>
+<path d="M33 22v11H22M40 39v11h-6" stroke="#ffffff" stroke-opacity=".85" stroke-width="1.5" stroke-linejoin="round" transform="rotate(12 36 36)"/>
+<path d="M12 30a25 25 0 0 1 19-19" stroke="#ffffff" stroke-opacity=".75" stroke-width="2" stroke-linecap="round"/>
 </svg>

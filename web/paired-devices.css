@@ -1,0 +1,11 @@
+.paired-devices {margin-top:22px;padding-top:20px;border-top:1px solid var(--line);}
+.paired-devices-heading {display:flex;align-items:center;justify-content:space-between;gap:12px;}
+.paired-devices-heading h3 {font-size:15px;margin:0;}.paired-devices-heading .text-action {margin:0;}
+#paired-devices-summary {font-size:12px;color:var(--muted);margin:6px 0 14px;min-height:18px;}
+.paired-devices-list {display:grid;gap:8px;}.paired-device-row {display:grid;grid-template-columns:36px minmax(0,1fr) auto 34px;align-items:center;gap:10px;padding:12px;border:1px solid var(--line);border-radius:12px;background:#fbfdfd9c;}
+.paired-device-icon {display:grid;place-items:center;width:36px;height:36px;color:#6c8c82;background:#e9f1ef;border-radius:10px;}
+.paired-device-icon svg,.remove-device svg {width:20px;height:20px;fill:none;stroke:currentColor;stroke-width:1.6;stroke-linecap:round;stroke-linejoin:round;}
+.paired-device-info {display:grid;gap:5px;min-width:0;}.paired-device-info strong {font-size:12px;font-weight:600;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}.paired-device-info small {font-size:10px;color:var(--muted);}
+.paired-device-badge {font-size:10px;color:#82908d;white-space:nowrap;}.paired-device-badge.is-online {color:#40836d;}
+.remove-device {width:34px;height:34px;display:grid;place-items:center;border:0;border-radius:9px;background:transparent;color:#8a9995;cursor:pointer;}.remove-device:hover {background:#f7e5e1;color:#ac6356;}
+.device-remove-dialog {width:min(420px,calc(100vw - 32px));padding:24px;border:1px solid var(--line);border-radius:18px;background:#f8fcfb;color:var(--ink);box-shadow:0 24px 80px #182e3d33;}.device-remove-dialog::backdrop {background:#10202b88;backdrop-filter:blur(4px);}.device-remove-dialog h2 {font-size:18px;margin:0 0 14px;}.device-remove-dialog p {font-size:13px;line-height:1.8;color:var(--muted);}.device-remove-footer {display:flex;justify-content:flex-end;gap:10px;margin-top:24px;}
